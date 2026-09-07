@@ -117,7 +117,13 @@ open class ProxyActivity : Activity() {
             } catch (e: Throwable) {
                 DiagLog.err("ProxyActivity", "guest launch exception", e)
             }
-            // dump full process logcat (framework + our traces) for post-mortem
+            // dump full process logcat (framework + our traces) for post-mortem.
+            // Delay first: AMS launch + activity create + onCreate take >500ms
+            // (KOS reference: ~1.5s from dispatch to 'Activity Created!').
+            // Dumping at +41ms cut the trace off right at the interesting part.
+            try {
+                Thread.sleep(1500)
+            } catch (ie: InterruptedException) { /* keep going */ }
             DiagLog.dumpLogcat("after guest launch (launched=$launched)")
             // Finish the bootstrap instance either way: on success the stub
             // relaunch (swapped to the real guest activity by newActivity)

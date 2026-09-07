@@ -122,7 +122,35 @@ class AetherInstrumentation(
     }
 
     override fun callActivityOnCreate(activity: Activity, icicle: Bundle?) {
+        // KOS-equivalent 'Installed guest ActivityInfo before onCreate': when
+        // the swapped guest activity is being created, its package/resource
+        // wiring must point at the GUEST, not the stub/host. The swapped guest
+        // Activity was instantiated with the guest classloader, but its base
+        // context is the STUB's (package com.aether) — swap mBase to the guest
+        // app context so getPackageName()/getResources()/theme resolve as the
+        // guest while the window + token (already created) remain intact.
+        try {
+            if (guestApp != null && activity.javaClass.name != stubComponent &&
+                activity.packageName != guestApp.packageName) {
+                val mBase = findFieldUp(activity.javaClass, "mBase")
+                if (mBase != null) {
+                    mBase.isAccessible = true
+                    mBase.set(activity, guestApp)
+                    DiagLog.d(TAG, "callActivityOnCreate: mBase → guest app ctx for ${activity.javaClass.name}")
+                }
+            }
+        } catch (e: Throwable) {
+            DiagLog.d(TAG, "pre-onCreate rewire: ${e.message}")
+        }
         base.callActivityOnCreate(activity, icicle)
+    }
+
+    private fun findFieldUp(start: Class<*>, name: String): java.lang.reflect.Field? {
+        var c: Class<*>? = start
+        while (c != null) {
+            try { return c.getDeclaredField(name) } catch (e: NoSuchFieldException) { c = c.superclass }
+        }
+        return null
     }
 
     // ─── Hook A: rewrite guest-targeted startActivity → stub, stash real ───

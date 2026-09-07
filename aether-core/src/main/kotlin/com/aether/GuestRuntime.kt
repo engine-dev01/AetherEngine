@@ -408,6 +408,10 @@ class GuestRuntime private constructor(
                 guestContext = guestCtx,
                 hookRegistry = hooks.also { it.hostApplication = hostContext.applicationContext as? Application },
             )
+            // KOS-equivalent 'Published guest LoadedApk': LoadedApk.mApplication
+            // must resolve to the GUEST app so framework factories and guest
+            // SDKs (getApplicationContext) see the guest, not null/host.
+            publishGuestApp(runtime, app)
             // Auto-bind ถ้า caller ขอ — ไม่บังคับ
             if (callOnCreate) runtime.bindToActivityThread()
             return Result.success(runtime)
@@ -455,10 +459,22 @@ class GuestRuntime private constructor(
                 val extCacheDir = File(sandboxRoot, "external_cache")
                 dataDir.mkdirs(); deDataDir.mkdirs(); extDataDir.mkdirs(); extCacheDir.mkdirs()
 
-                val ok = setFieldB(loadedApk, "mDataDir", dataDir)
-                setFieldB(loadedApk, "mDeDataDir", deDataDir)
-                setFieldB(loadedApk, "mExternalDataDir", extDataDir)
+                // API 36 verified field names (LoadedApk): mDataDirFile is the
+                // File the lazily-built dirs derive from; mCredentialProtectedDataDir
+                // (String) is what getDataDir() reads. Older names (mDataDir) are
+                // absent on modern AOSP — setting them silently failed (verified
+                // 'mDataDir ok=false' on device, data never re-rooted).
+                var anyOk = false
+                anyOk = setFieldB(loadedApk, "mDataDirFile", dataDir) || anyOk
+                anyOk = setFieldB(loadedApk, "mDataDir", dataDir) || anyOk
+                anyOk = setFieldB(loadedApk, "mCredentialProtectedDataDir", dataDir.absolutePath) || anyOk
+                anyOk = setFieldB(loadedApk, "mDeviceProtectedDataDir", dataDir.absolutePath) || anyOk
+                setFieldB(loadedApk, "mDeDataDir", deDataDir)                 // legacy name
+                setFieldB(loadedApk, "mCredentialProtectedDeDataDir", deDataDir.absolutePath)
+                setFieldB(loadedApk, "mExternalDataDir", extDataDir)         // legacy name
+                setFieldB(loadedApk, "mDeviceProtectedExternalDataDir", extDataDir.absolutePath)
                 setFieldB(loadedApk, "mExternalCacheDir", extCacheDir)
+                val ok = anyOk
 
                 val appInfo = fieldValueOrNull(loadedApk, "applicationInfo") as? ApplicationInfo
                 if (appInfo != null) {
@@ -486,6 +502,25 @@ class GuestRuntime private constructor(
             } catch (e: Throwable) {
                 Log.e(TAG, "redirectDataDirs failed", e)
                 false
+            }
+        }
+
+        /**
+         * Publish the guest into its own LoadedApk (KOS 'Published guest LoadedApk
+         * for framework factory resolution' equivalent):
+         *   - LoadedApk.mApplication = guest app (else getApplicationContext()
+         *     resolves null/host and framework factories NPE — verified device
+         *     log 'MBLifecycleProvider ... on a null object')
+         *   - LoadedApk.mClassLoader = guest loader so AppComponentFactory
+         *     resolution uses guest classes
+         */
+        private fun publishGuestApp(runtime: GuestRuntime, guestApp: Application) {
+            try {
+                val apk = fieldValueOrNull(runtime.guestContext, "mPackageInfo") ?: return
+                setFieldB(apk, "mApplication", guestApp)
+                Log.i(TAG, "publishGuestApp: LoadedApk.mApplication=${guestApp.javaClass.name}")
+            } catch (e: Throwable) {
+                Log.w(TAG, "publishGuestApp: ${e.message}")
             }
         }
 
