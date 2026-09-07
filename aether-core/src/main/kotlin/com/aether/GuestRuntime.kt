@@ -75,13 +75,44 @@ class GuestRuntime private constructor(
      */
     fun bindToActivityThread(): Boolean {
         val at = currentActivityThreadOrNull() ?: return false
+        // Hard guard (verified crash 2026-09-07, logcat 21:38/21:39/21:40):
+        // a guest Application without a base context (mBase == null) must NOT
+        // be bound into mInitialApplication — the next activity launch calls
+        // ConfigurationController.updateLocaleListFromAppContext(getApplication())
+        // → getResources() → NPE → :p0 process dies → UI bounces back.
+        val mBase = appMBaseOrNull(guestApplication)
+        if (mBase == null) {
+            Log.e(TAG, "bindToActivityThread REFUSED: guest Application has no base context")
+            return false
+        }
         var anyOk = false
         anyOk = bindInitialApplication(at) || anyOk
         anyOk = bindAllApplications(at) || anyOk
         anyOk = bindResources(at) || anyOk
         if (anyOk) state.set(State.ACTIVE)
         hookRegistry.onBound?.invoke(this)
+        // Diagnostics: exactly which pass landed where (previously "3-pass OK"
+        // masked a failed mInitialApplication bind).
+        val nowInitial = fieldValueOrNull(at, "mInitialApplication")
+        Log.i(TAG, "bindToActivityThread: ok=$anyOk mInitialApplication=${nowInitial?.javaClass?.name} (guest=${guestApplication.javaClass.name})")
         return anyOk
+    }
+
+    /** Base context (ContextWrapper.mBase) of [app], or null if not attached. */
+    private fun appMBaseOrNull(app: Application): Any? {
+        var c: Class<*>? = app.javaClass
+        while (c != null) {
+            try {
+                val f = c.getDeclaredField("mBase")
+                f.isAccessible = true
+                return f.get(app)
+            } catch (e: NoSuchFieldException) {
+                c = c.superclass
+            } catch (e: Throwable) {
+                return null
+            }
+        }
+        return null
     }
 
     /**
@@ -352,7 +383,14 @@ class GuestRuntime private constructor(
             val app = instantiateApplication(appClass, guestCtx) ?: return Result.failure(
                 IllegalStateException("instantiateApplication($appClassName) failed")
             )
-            attachBaseContext(app, guestCtx)
+            // Hard guard: never return a baseless guest Application — binding
+            // it into mInitialApplication would NPE :p0 on the next activity
+            // launch (ConfigurationController.updateLocaleListFromAppContext).
+            if (!attachBaseContext(app, guestCtx)) {
+                return Result.failure(IllegalStateException(
+                    "attachBaseContext failed — guest Application has no base context; " +
+                    "refusing to bind (would crash :p0 on next activity launch)"))
+            }
 
             val runtime = GuestRuntime(
                 targetPkg = targetPkg,
@@ -410,14 +448,43 @@ class GuestRuntime private constructor(
             }
         }
 
-        private fun attachBaseContext(app: Application, base: Context) {
-            try {
-                val m = android.content.ContextWrapper::class.java
-                    .getDeclaredMethod("attachBaseContext", Context::class.java)
-                m.isAccessible = true
-                m.invoke(app, base)
+        /**
+         * Attach [base] to [app] via DIRECT mBase field assignment.
+         *
+         * Deterministic + idempotent — no framework-method invoke (the
+         * reflection call to ContextWrapper.attachBaseContext failed on device
+         * with an uninformative exception; verified 2026-09-07 logcat
+         * "attachBaseContext: null" followed by ConfigurationController NPE).
+         *
+         * A guest Application bound into ActivityThread.mInitialApplication
+         * with mBase == null NPEs the whole :p0 process on the next activity
+         * launch (updateLocaleListFromAppContext → getResources()).
+         *
+         * @return true if the app has a valid base context after the call
+         */
+        private fun attachBaseContext(app: Application, base: Context): Boolean {
+            return try {
+                // mBase is declared on ContextWrapper — walk the hierarchy
+                var c: Class<*>? = app.javaClass
+                var field: java.lang.reflect.Field? = null
+                while (c != null) {
+                    try { field = c.getDeclaredField("mBase"); break }
+                    catch (e: NoSuchFieldException) { c = c.superclass }
+                }
+                if (field == null) {
+                    Log.w(TAG, "attachBaseContext: mBase field NOT FOUND in ${app.javaClass.name} hierarchy")
+                    return false
+                }
+                field.isAccessible = true
+                if (field.get(app) == null) {
+                    field.set(app, base)
+                }
+                val ok = field.get(app) != null
+                Log.i(TAG, "attachBaseContext: mBase=${field.get(app)?.javaClass?.name} (ok=$ok)")
+                ok
             } catch (e: Throwable) {
-                Log.w(TAG, "attachBaseContext: ${e.message}")
+                Log.w(TAG, "attachBaseContext: ${e.javaClass.simpleName}: ${e.message}")
+                false
             }
         }
 

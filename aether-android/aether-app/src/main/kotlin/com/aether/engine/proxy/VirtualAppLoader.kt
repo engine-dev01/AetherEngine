@@ -166,12 +166,16 @@ object VirtualAppLoader {
                     ClassLoader::class.java, String::class.java, Context::class.java
                 )
                 val app = m.invoke(instr, appClass.classLoader, appClass.name, context) as Application
-                return app
+                // newApplication attaches internally — verify, re-attach if needed.
+                // A baseless app must NEVER be returned (ConfigurationController NPE).
+                if (attachBaseContext(app, context)) return app
             }
         }
-        // fallback: direct instantiation + attach via reflection
+        // fallback: direct instantiation + attach
         val app = appClass.getDeclaredConstructor().newInstance() as Application
-        attachBaseContext(app, context)
+        if (!attachBaseContext(app, context)) {
+            throw IllegalStateException("attachBaseContext failed — guest app has no base context")
+        }
         return app
     }
 
@@ -187,6 +191,12 @@ object VirtualAppLoader {
      */
     private fun bindCurrentApplication(app: Application): Boolean {
         val at = currentActivityThread() ?: return false
+        // Guard: never bind a baseless app into mInitialApplication —
+        // ConfigurationController NPEs on the next activity launch.
+        if (appMBaseOrNull(app) == null) {
+            Log.e(TAG, "bindCurrentApplication REFUSED: guest app has no base context")
+            return false
+        }
         var okInitial = false
         try {
             val f = findField(at.javaClass, "mInitialApplication")
@@ -208,15 +218,50 @@ object VirtualAppLoader {
         return okInitial
     }
 
-    private fun attachBaseContext(app: Application, base: Context) {
-        try {
-            val m = android.content.ContextWrapper::class.java
-                .getDeclaredMethod("attachBaseContext", Context::class.java)
-            m.isAccessible = true
-            m.invoke(app, base)
+    /**
+     * Attach [base] to [app] via DIRECT mBase field assignment (deterministic +
+     * idempotent). Returns true if the app has a valid base context after.
+     */
+    private fun attachBaseContext(app: Application, base: Context): Boolean {
+        return try {
+            var c: Class<*>? = app.javaClass
+            var field: java.lang.reflect.Field? = null
+            while (c != null) {
+                try { field = c.getDeclaredField("mBase"); break }
+                catch (e: NoSuchFieldException) { c = c.superclass }
+            }
+            if (field == null) {
+                Log.w(TAG, "attachBaseContext: mBase field NOT FOUND in ${app.javaClass.name} hierarchy")
+                return false
+            }
+            field.isAccessible = true
+            if (field.get(app) == null) {
+                field.set(app, base)
+            }
+            val ok = field.get(app) != null
+            Log.i(TAG, "attachBaseContext: mBase=${field.get(app)?.javaClass?.name} (ok=$ok)")
+            ok
         } catch (e: Throwable) {
-            Log.w(TAG, "attachBaseContext: ${e.message}")
+            Log.w(TAG, "attachBaseContext: ${e.javaClass.simpleName}: ${e.message}")
+            false
         }
+    }
+
+    /** Base context (ContextWrapper.mBase) of [app], or null if not attached. */
+    private fun appMBaseOrNull(app: Application): Any? {
+        var c: Class<*>? = app.javaClass
+        while (c != null) {
+            try {
+                val f = c.getDeclaredField("mBase")
+                f.isAccessible = true
+                return f.get(app)
+            } catch (e: NoSuchFieldException) {
+                c = c.superclass
+            } catch (e: Throwable) {
+                return null
+            }
+        }
+        return null
     }
 
     /**
