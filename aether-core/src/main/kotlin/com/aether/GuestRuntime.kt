@@ -258,6 +258,24 @@ class GuestRuntime private constructor(
      */
     private fun installOneProvider(providerClass: String, loader: ClassLoader): Any? {
         return try {
+            // Skip GMS/ads/analytics providers that talk to Google Play services
+            // with the guest package name — under virtualization the calling UID
+            // is ours, so binder calls with the GUEST package fail with
+            // SecurityException (verified: dynamite measurement 'Unknown calling
+            // package name' kills main thread). These providers are NOT needed
+            // for the game itself to run; installing them only risks crashes.
+            val skipPrefixes = listOf(
+                "com.google.android.gms.",   // Play services (ads, games, measurement)
+                "com.google.firebase.",      // Firebase (measurement dynamite = main-thread killer)
+                "io.bidmachine.",            // ads
+                "com.vungle.",               // ads
+                "com.ironsource.",           // ads
+                "com.applovin.",             // ads
+                "com.facebook.ads.",         // FB audience network
+            )
+            if (skipPrefixes.any { providerClass.startsWith(it) }) {
+                return "skipped (ads/gms provider — unsafe under virtual UID)"
+            }
             val cls = loader.loadClass(providerClass)
             val provider = cls.getDeclaredConstructor().newInstance() as? ContentProvider
             if (provider == null) {
@@ -454,25 +472,31 @@ class GuestRuntime private constructor(
                     return false
                 }
                 val dataDir = sandboxRoot
-                val deDataDir = File(sandboxRoot, "no_backup")
+                // Device-protected (DE) equivalent: vision/data/user_de/0/<pkg>
+                // (mirrors the real /data/user_de/0 split — SandboxManager creates it)
+                val deDataDir = sandboxRoot.parentFile?.parentFile?.parentFile
+                    ?.let { File(it, "user_de/0/${sandboxRoot.name}") } ?: File(sandboxRoot, "de")
                 val extDataDir = File(sandboxRoot, "external")
                 val extCacheDir = File(sandboxRoot, "external_cache")
                 dataDir.mkdirs(); deDataDir.mkdirs(); extDataDir.mkdirs(); extCacheDir.mkdirs()
 
-                // API 36 verified field names (LoadedApk): mDataDirFile is the
-                // File the lazily-built dirs derive from; mCredentialProtectedDataDir
-                // (String) is what getDataDir() reads. Older names (mDataDir) are
-                // absent on modern AOSP — setting them silently failed (verified
-                // 'mDataDir ok=false' on device, data never re-rooted).
+                // API 36 LoadedApk (verified against AOSP android-16 LoadedApk.java):
+                //   mDataDirFile                  File   ← getDataDirFile()
+                //   mCredentialProtectedDataDirFile File ← getCredentialProtectedDataDirFile()
+                //   mDeviceProtectedDataDirFile    File   ← getDeviceProtectedDataDirFile()
+                //   mDataDir                       String ← getDataDir()
+                // ContextImpl.getDataDir() reads mCredentialProtectedDataDirFile (normal
+                // storage) → ALL of getFilesDir/getDatabasePath/getSharedPreferences
+                // derive from it. 'mCredentialProtectedDataDir' (no File suffix) does
+                // NOT exist on LoadedApk (that name is ApplicationInfo-only) — the
+                // previous round set the wrong name and data never re-rooted.
                 var anyOk = false
+                anyOk = setFieldB(loadedApk, "mCredentialProtectedDataDirFile", dataDir) || anyOk
                 anyOk = setFieldB(loadedApk, "mDataDirFile", dataDir) || anyOk
-                anyOk = setFieldB(loadedApk, "mDataDir", dataDir) || anyOk
-                anyOk = setFieldB(loadedApk, "mCredentialProtectedDataDir", dataDir.absolutePath) || anyOk
-                anyOk = setFieldB(loadedApk, "mDeviceProtectedDataDir", dataDir.absolutePath) || anyOk
+                anyOk = setFieldB(loadedApk, "mDeviceProtectedDataDirFile", deDataDir) || anyOk
+                anyOk = setFieldB(loadedApk, "mDataDir", dataDir.absolutePath) || anyOk
                 setFieldB(loadedApk, "mDeDataDir", deDataDir)                 // legacy name
-                setFieldB(loadedApk, "mCredentialProtectedDeDataDir", deDataDir.absolutePath)
                 setFieldB(loadedApk, "mExternalDataDir", extDataDir)         // legacy name
-                setFieldB(loadedApk, "mDeviceProtectedExternalDataDir", extDataDir.absolutePath)
                 setFieldB(loadedApk, "mExternalCacheDir", extCacheDir)
                 val ok = anyOk
 

@@ -182,8 +182,20 @@ open class ProxyActivity : Activity() {
             val isMain = t === Looper.getMainLooper().thread
             DiagLog.err("ProxyActivity", "guest-firewall caught on ${t.name} (main=$isMain)", e)
             DiagLog.dumpLogcat("firewall main=$isMain thread=${t.name}")
-            // Contain background/guest threads; only propagate a genuine main-thread crash.
-            if (isMain) prev?.uncaughtException(t, e)
+            // GUEST ISOLATION: once the guest Application has been started in
+            // this process, SDK background work (GMS dynamite measurement,
+            // WorkManager, Crashlytics, Play Games shortcuts...) regularly
+            // throws SecurityException because binder calls carry the guest
+            // package name under our host UID. These are NOT host bugs and
+            // must NOT kill the whole process — KOS survives them via its
+            // VirtualServiceContext; we survive them by containing EVERY
+            // exception from guest-started work (any thread, including main
+            // Handler messages dispatched by guest SDKs).
+            // A truly-dead main looper is unrecoverable either way, but the
+            // framework has already torn the activity down by the time an
+            // uncaught handler runs — swallowing here keeps the process alive
+            // so the guest activity (already dispatched) can still launch.
+            // DO NOT propagate to prev (default kill) while a guest is active.
         }
     }
 
