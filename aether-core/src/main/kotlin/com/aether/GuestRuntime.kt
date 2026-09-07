@@ -463,12 +463,22 @@ class GuestRuntime private constructor(
                 val appInfo = fieldValueOrNull(loadedApk, "applicationInfo") as? ApplicationInfo
                 if (appInfo != null) {
                     try {
-                        val clone = appInfo.clone() as ApplicationInfo
-                        clone.dataDir = dataDir.absolutePath
-                        setFieldB(loadedApk, "applicationInfo", clone)
-                        setFieldB(ctx, "mApplicationInfo", clone)
+                        // Deep copy via the Parcelable round-trip (ApplicationInfo
+                        // has no public clone()). The copy avoids mutating the
+                        // system's shared/cached ApplicationInfo instance.
+                        val parcel = android.os.Parcel.obtain()
+                        try {
+                            appInfo.writeToParcel(parcel, 0)
+                            parcel.position = 0
+                            val copy = ApplicationInfo.CREATOR.createFromParcel(parcel)
+                            copy.dataDir = dataDir.absolutePath
+                            setFieldB(loadedApk, "applicationInfo", copy)
+                            setFieldB(ctx, "mApplicationInfo", copy)
+                        } finally {
+                            parcel.recycle()
+                        }
                     } catch (e: Throwable) {
-                        Log.w(TAG, "redirectDataDirs: ApplicationInfo clone: ${e.message}")
+                        Log.w(TAG, "redirectDataDirs: ApplicationInfo copy: ${e.message}")
                     }
                 }
                 Log.i(TAG, "redirectDataDirs: $targetPkg → ${dataDir.absolutePath} (mDataDir ok=$ok)")
