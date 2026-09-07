@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.ProviderInfo
 import android.util.Log
+import java.io.File
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -342,12 +343,19 @@ class GuestRuntime private constructor(
         private var appClassHint: String? = null
         private var callOnCreate: Boolean = false
         private var providers: List<String> = emptyList()
+        private var sandboxDataDir: File? = null
         private val hooks = HookRegistry()
 
         fun sessionId(id: String) = apply { sessionId = id }
         fun applicationClassHint(fqcn: String) = apply { appClassHint = fqcn }
         fun autoStartApplication() = apply { callOnCreate = true }
         fun installProviders(classes: List<String>) = apply { providers = classes }
+        /**
+         * Re-root guest data dirs (files/cache/databases/external) into [dir] —
+         * VirtualFS data isolation. Without this the guest reads/writes the REAL
+         * installed app's data dir (/data/user/0/<targetPkg>), not the sandbox.
+         */
+        fun sandboxDataDir(dir: File?) = apply { this.sandboxDataDir = dir }
 
         fun onCreated(block: (GuestRuntime) -> Unit) = apply { hooks.onCreated = block }
         fun onBound(block: (GuestRuntime) -> Unit) = apply { hooks.onBound = block }
@@ -408,13 +416,85 @@ class GuestRuntime private constructor(
         // ── Builder-private helpers ──
 
         private fun createGuestContext(): Context? = try {
-            hostContext.createPackageContext(
+            val ctx = hostContext.createPackageContext(
                 targetPkg,
                 CONTEXT_INCLUDE_CODE or CONTEXT_IGNORE_SECURITY
             )
+            sandboxDataDir?.let { root -> redirectDataDirs(ctx, root) }
+            ctx
         } catch (e: Throwable) {
             Log.w(TAG, "createPackageContext: ${e.message}")
             null
+        }
+
+        /**
+         * Re-root the guest's data paths into [sandboxRoot] (VirtualFS data
+         * isolation).
+         *
+         * createPackageContext points the LoadedApk's data paths at the REAL
+         * /data/user/0/<targetPkg>, so the guest would read/write the real
+         * installed app's data. Patching the LoadedApk File fields makes
+         * getFilesDir()/getCacheDir()/getDatabasePath() (lazily derived from
+         * mDataDir) and the external dirs resolve under the sandbox instead.
+         *
+         * Also clones ApplicationInfo and re-points dataDir — guest SDKs
+         * (Unity/Firebase) read applicationInfo.dataDir directly. The clone
+         * avoids mutating the system's shared ApplicationInfo instance.
+         *
+         * @return true if mDataDir was re-rooted
+         */
+        private fun redirectDataDirs(ctx: Context, sandboxRoot: File): Boolean {
+            return try {
+                val loadedApk = fieldValueOrNull(ctx, "mPackageInfo") ?: run {
+                    Log.w(TAG, "redirectDataDirs: mPackageInfo not found on ${ctx.javaClass.name}")
+                    return false
+                }
+                val dataDir = sandboxRoot
+                val deDataDir = File(sandboxRoot, "no_backup")
+                val extDataDir = File(sandboxRoot, "external")
+                val extCacheDir = File(sandboxRoot, "external_cache")
+                dataDir.mkdirs(); deDataDir.mkdirs(); extDataDir.mkdirs(); extCacheDir.mkdirs()
+
+                val ok = setFieldB(loadedApk, "mDataDir", dataDir)
+                setFieldB(loadedApk, "mDeDataDir", deDataDir)
+                setFieldB(loadedApk, "mExternalDataDir", extDataDir)
+                setFieldB(loadedApk, "mExternalCacheDir", extCacheDir)
+
+                val appInfo = fieldValueOrNull(loadedApk, "applicationInfo") as? ApplicationInfo
+                if (appInfo != null) {
+                    try {
+                        val clone = appInfo.clone() as ApplicationInfo
+                        clone.dataDir = dataDir.absolutePath
+                        setFieldB(loadedApk, "applicationInfo", clone)
+                        setFieldB(ctx, "mApplicationInfo", clone)
+                    } catch (e: Throwable) {
+                        Log.w(TAG, "redirectDataDirs: ApplicationInfo clone: ${e.message}")
+                    }
+                }
+                Log.i(TAG, "redirectDataDirs: $targetPkg → ${dataDir.absolutePath} (mDataDir ok=$ok)")
+                ok
+            } catch (e: Throwable) {
+                Log.e(TAG, "redirectDataDirs failed", e)
+                false
+            }
+        }
+
+        /** Set field [name] on [target] (walking the class hierarchy). @return true if set. */
+        private fun setFieldB(target: Any, name: String, value: Any): Boolean {
+            var c: Class<*>? = target.javaClass
+            while (c != null) {
+                try {
+                    val f = c.getDeclaredField(name)
+                    f.isAccessible = true
+                    f.set(target, value)
+                    return true
+                } catch (e: NoSuchFieldException) {
+                    c = c.superclass
+                } catch (e: Throwable) {
+                    return false
+                }
+            }
+            return false
         }
 
         private fun resolveApplicationInfo(): ApplicationInfo? = try {

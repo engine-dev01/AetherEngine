@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.os.Looper
+import java.io.File
 
 /**
  * ProxyActivity — Multi-process worker activity (multi-process :p0-:p3)
@@ -30,6 +31,12 @@ open class ProxyActivity : Activity() {
 
         val targetPkg = intent.getStringExtra("target_package") ?: "com.aether"
         val isVirtual = targetPkg.isNotEmpty() && targetPkg != "com.aether"
+
+        // VirtualFS data isolation: the guest must read/write its OWN sandboxed
+        // data (vision/data/user/0/<pkg>) — NOT the real installed app's data
+        // dir. target_sandbox = virtual root (vision/); package dir derived.
+        val guestDataDir = intent.getStringExtra("target_sandbox")
+            ?.let { root -> File(root, "data/user/0/$targetPkg") }
 
         DiagLog.init(applicationContext)
         DiagLog.d("ProxyActivity", "onCreate target=$targetPkg virtual=$isVirtual pid=${android.os.Process.myPid()}")
@@ -82,8 +89,12 @@ open class ProxyActivity : Activity() {
                     targetPkg = targetPkg,
                     appClassHint = gm.appClass,
                     callOnCreate = true,
-                    providers = gm.providers
+                    providers = gm.providers,
+                    sandboxDir = guestDataDir
                 )
+                if (guestDataDir != null) {
+                    DiagLog.d("ProxyActivity", "guest data dir → ${guestDataDir.absolutePath}")
+                }
                 DiagLog.d("ProxyActivity",
                     "GuestRuntimeBridge($targetPkg) -> ${res.success} (${res.reason}) " +
                     "source=${res.runtimeSource} providers=${res.providersInstalled}/${gm.providers.size} " +

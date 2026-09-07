@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.util.Log
 import com.aether.GuestRuntime
+import java.io.File
 
 /**
  * GuestRuntimeBridge — compat layer ระหว่าง [VirtualAppLoader] (v1) และ [GuestRuntime] (v2)
@@ -162,19 +163,22 @@ object GuestRuntimeBridge {
         appClassHint: String? = null,
         callOnCreate: Boolean = false,
         providers: List<String> = emptyList(),
+        // Optional: re-root guest data dirs into the sandbox (VirtualFS data
+        // isolation). null = guest uses the real installed app's data dir.
+        sandboxDir: File? = null,
     ): LoadResult {
         val t0 = System.currentTimeMillis()
         val events = mutableListOf<LoadEvent>()
 
         val result = when (mode) {
             RuntimeMode.V2_ONLY -> loadV2(hostContext, targetPkg, appClassHint,
-                callOnCreate, providers, events)
+                callOnCreate, providers, sandboxDir, events)
             RuntimeMode.V1_ONLY -> loadV1(hostContext, targetPkg, appClassHint,
                 callOnCreate, providers, events)
             RuntimeMode.DUAL -> loadDual(hostContext, targetPkg, appClassHint,
-                callOnCreate, providers, events)
+                callOnCreate, providers, sandboxDir, events)
             RuntimeMode.AUTO -> loadAuto(hostContext, targetPkg, appClassHint,
-                callOnCreate, providers, events)
+                callOnCreate, providers, sandboxDir, events)
         }
 
         val totalMs = System.currentTimeMillis() - t0
@@ -224,9 +228,10 @@ object GuestRuntimeBridge {
         appClassHint: String?,
         callOnCreate: Boolean,
         providers: List<String>,
+        sandboxDir: File?,
         events: MutableList<LoadEvent>,
     ): LoadResult {
-        val v2 = loadV2(hostContext, targetPkg, appClassHint, callOnCreate, providers, events)
+        val v2 = loadV2(hostContext, targetPkg, appClassHint, callOnCreate, providers, sandboxDir, events)
         if (v2.success) return v2
 
         // Fallback to v1
@@ -245,6 +250,7 @@ object GuestRuntimeBridge {
         appClassHint: String?,
         callOnCreate: Boolean,
         providers: List<String>,
+        sandboxDir: File?,
         events: MutableList<LoadEvent>,
     ): LoadResult {
         val sessionId = "bridge-${System.currentTimeMillis()}"
@@ -255,6 +261,7 @@ object GuestRuntimeBridge {
             .sessionId(sessionId)
             .apply { if (!appClassHint.isNullOrEmpty()) applicationClassHint(appClassHint) }
             .installProviders(providers)
+            .sandboxDataDir(sandboxDir)
             .apply { if (callOnCreate) autoStartApplication() }
             .build()
 
@@ -288,8 +295,20 @@ object GuestRuntimeBridge {
             )
         }
 
-        // Install providers (ถ้า build ไม่ได้ทำ — แต่ build ทำไปแล้ว เพราะ flag ใน builder)
-        val installed = runtime.providersInstalled
+        // Install guest ContentProviders (Firebase/FB/AppLovin/androidx-startup
+        // initialize via attachInfo→onCreate). Must run AFTER the bind —
+        // providers read ActivityThread.currentApplication(). Previously
+        // never invoked (device log showed providersInstalled=0/13).
+        val installed = runtime.installProviders(providers)
+
+        // Start the guest Application lifecycle — SDK + game data managers
+        // initialize in onCreate. Order matches Android bindApplication:
+        // bind → providers → callApplicationOnCreate.
+        if (callOnCreate) {
+            runtime.callOnCreate().onFailure { e ->
+                Log.w(TAG, "v2 callOnCreate failed: ${e.message}")
+            }
+        }
 
         activeRuntime = runtime
         events.add(LoadEvent.V2Success(installed))
@@ -350,9 +369,10 @@ object GuestRuntimeBridge {
         appClassHint: String?,
         callOnCreate: Boolean,
         providers: List<String>,
+        sandboxDir: File?,
         events: MutableList<LoadEvent>,
     ): LoadResult {
-        val v2 = loadV2(hostContext, targetPkg, appClassHint, callOnCreate, providers, events)
+        val v2 = loadV2(hostContext, targetPkg, appClassHint, callOnCreate, providers, sandboxDir, events)
         if (v2.success) return v2
 
         events.add(LoadEvent.FallbackTriggered(v2.reason))
