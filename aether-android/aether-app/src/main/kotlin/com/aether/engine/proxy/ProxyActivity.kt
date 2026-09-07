@@ -108,7 +108,10 @@ open class ProxyActivity : Activity() {
             }
             // dump full process logcat (framework + our traces) for post-mortem
             DiagLog.dumpLogcat("after guest launch (launched=$launched)")
-            if (!launched) finish()
+            // Finish the bootstrap instance either way: on success the stub
+            // relaunch (swapped to the real guest activity by newActivity)
+            // replaces it on the backstack; on failure there is nothing to show.
+            finish()
             return
         }
 
@@ -117,20 +120,29 @@ open class ProxyActivity : Activity() {
     }
 
     /**
-     * Scaffold-4: start the guest launcher activity THROUGH the stub. The
-     * Intent targets the guest class; AetherInstrumentation.execStartActivity
-     * rewrites it to ProxyActivity$P0 (registered, so AMS keeps it in :p0) and
-     * newActivity swaps the stub back to the real guest Activity. Returns true
-     * if startActivity was dispatched.
+     * Scaffold-4: start the guest launcher activity THROUGH the stub.
+     *
+     * The intent is REWRITTEN UP FRONT to ProxyActivity$P0 (registered in our
+     * manifest under :p0) with the real guest class/package stashed in extras —
+     * then AetherInstrumentation.newActivity (hook B, public override) swaps the
+     * stub back to the real guest Activity inside :p0.
+     *
+     * Previously this dispatched setClassName(targetPkg, launcher) directly and
+     * relied on execStartActivity to rewrite it. execStartActivity is a HIDDEN
+     * API that ActivityThread invokes via reflection on the concrete framework
+     * signature — a Kotlin subclass method is never dispatched, so the rewrite
+     * never ran and AMS routed the intent OUT to the real installed app.
      */
     private fun startGuestActivity(targetPkg: String, launcher: String): Boolean {
         return try {
-            val intent = Intent().apply {
-                setClassName(targetPkg, launcher)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
+            val intent = AetherInstrumentation.buildStubIntent(
+                hostPkg = packageName,
+                stubComponent = "com.aether.engine.proxy.ProxyActivity\$P0",
+                guestPkg = targetPkg,
+                guestClass = launcher,
+            )
             startActivity(intent)
-            DiagLog.d("ProxyActivity", "guest activity dispatched via hook: $targetPkg/$launcher")
+            DiagLog.d("ProxyActivity", "guest activity dispatched via stub: $targetPkg/$launcher → P0")
             true
         } catch (e: Throwable) {
             DiagLog.err("ProxyActivity", "startGuestActivity($launcher)", e)

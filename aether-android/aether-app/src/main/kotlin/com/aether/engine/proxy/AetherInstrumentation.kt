@@ -38,8 +38,10 @@ class AetherInstrumentation(
 
     companion object {
         private const val TAG = "AetherInstr"
-        private const val EXTRA_GUEST_INTENT = "aether.guest_intent"
-        private const val EXTRA_GUEST_CLASS = "aether.guest_class"
+        // Public so ProxyActivity can stash the guest target on the stub intent
+        // (buildStubIntent) and newActivity (hook B) can read it back to swap.
+        const val EXTRA_GUEST_INTENT = "aether.guest_intent"
+        const val EXTRA_GUEST_CLASS = "aether.guest_class"
 
         @Volatile private var installed = false
 
@@ -70,6 +72,34 @@ class AetherInstrumentation(
                 DiagLog.err(TAG, "install failed", e)
                 false
             }
+        }
+
+        /**
+         * Build a STUB intent that AMS knows (targets [stubComponent], which is
+         * registered in OUR manifest under :p0) while stashing the real guest
+         * activity class + guest package in extras.
+         *
+         * Why not startActivity(guestIntent) directly: the guest activity is NOT
+         * in our manifest, so AMS routes the intent OUT to the real installed app
+         * (the 8BP process). The stub IS in our manifest → AMS launches it in :p0;
+         * newActivity (hook B, a PUBLIC override) then swaps stub → real guest
+         * activity using the guest classloader.
+         *
+         * This deliberately avoids execStartActivity (a hidden API that cannot be
+         * reliably overridden on modern Android — the subclass method is never
+         * invoked by ActivityThread). Rewriting the intent BEFORE startActivity is
+         * the stable VirtualApp/DroidPlugin equivalent.
+         */
+        fun buildStubIntent(
+            hostPkg: String,
+            stubComponent: String,
+            guestPkg: String,
+            guestClass: String,
+        ): Intent = Intent().apply {
+            setClassName(hostPkg, stubComponent)
+            putExtra(EXTRA_GUEST_CLASS, guestClass)
+            putExtra(EXTRA_GUEST_INTENT, guestPkg)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
     }
 
