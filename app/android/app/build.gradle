@@ -1,0 +1,85 @@
+// AetherEngine — Flutter :app module (generated scaffold, validated for flutter build apk)
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+android {
+    namespace = "com.aether"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_17
+    }
+
+    defaultConfig {
+        applicationId = "com.aether"
+ // minSdk 28
+        // ไม่ใช้ flutter.minSdkVersion (default 21 < aether-android 28)
+        minSdk = 28
+        targetSdk = flutter.targetSdkVersion
+        // App version (pubspec 1.0.0+1). The GAME version (56.23.2) is the
+        // game's own data version — fixed at build time (no remote config).
+        versionCode = 1
+        versionName = "1.0.0"
+        // arm64-only: devices สมัยใหม่ (Android 14+) — ตัด armeabi-v7a/x86_64
+        // ลด APK ~27MB (เหลือ lib/arm64-v8a อย่างเดียว)
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
+    }
+
+    buildTypes {
+        release {
+            // ⚠️ R8/minify OFF — จำเป็นสำหรับ JNI + reflection:
+            // 1. JNI: aether_core.cpp RegisterNatives ลงทะเบียน ~40 methods
+            //    แต่ R8 strip methods ที่ไม่ถูกอ้างจาก Kotlin (nativeCompute ฯลฯ
+            //    = 0 ใน dex) → RegisterNatives fail → JNI_OnLoad
+            //    คืน JNI_ERR → libaether.so load ไม่ได้ → engine ตายทั้งก้อน
+            // 2. Reflection: ServiceBinderProxy / Flagger /
+            //    MethodUtils ใช้ reflection → R8 obfuscate ชื่อคลาส = พัง
+            minifyEnabled false
+            shrinkResources false
+            // ═══ Release signing — bulletproof ✍️ ═══
+            // CI ใช้ keystore ที่สร้างไว้ชัดเจน (env ANDROID_DEBUG_KEYSTORE)
+            // ไม่พึ่ง signingConfigs.debug ที่ AGP ไปอ่าน ~/.config/.android/
+            // (path ผิดตำแหน่ง → APK unsigned → ติดตั้งไม่ได้)
+            // และไม่พึ่ง secrets (ช่วงทดสอบยังไม่มี KEYSTORE_BASE64)
+            if (System.getenv("ANDROID_DEBUG_KEYSTORE") != null) {
+                def dks = System.getenv("ANDROID_DEBUG_KEYSTORE")
+                signingConfigs.create("ciRelease") {
+                    storeFile = file(dks)
+                    storePassword = "android"
+                    keyAlias = "androiddebugkey"
+                    keyPassword = "android"
+                }
+                signingConfig = signingConfigs.ciRelease
+            } else {
+                signingConfig = signingConfigs.debug
+            }
+        }
+    }
+}
+
+dependencies {
+    // Phase 3: engine module เข้า APK — manifest components + AetherApp
+    // aether-core: EngineBridge ใช้ SandboxManager/Engine โดยตรง
+    // (aether-android implementation() ไม่ leak ขึ้นมา — ต้องประกาศเอง)
+    implementation project(':aether-android')
+    implementation project(':aether-core')
+    // native engine (libaether.so) — direct dep so AGP packages the .so into the APK
+    // (transitive via :aether-android does NOT reliably propagate native libs)
+    implementation project(':aether-native')
+}
+
+flutter {
+    source = "../.."
+}

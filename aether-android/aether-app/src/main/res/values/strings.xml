@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- IPC Signature Permission -->
+    <string name="ipc_access_label">Aether Engine IPC Access</string>
+    <string name="ipc_access_description">Allows access to Aether Engine IPC endpoints.</string>
+</resources>

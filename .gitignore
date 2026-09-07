@@ -1,0 +1,62 @@
+# Gradle
+**/build/
+**/.gradle/
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+
+# CMake / Native
+*.o
+*.so
+a.out
+*.bin
+
+# Android
+local.properties
+*.apk
+*.aab
+*.keystore
+*.jks
+*.p12
+!gradle-wrapper.jar
+
+# keep binary wrapper jars tracked even though other binaries are ignored
+!**/gradle-wrapper.jar
+
+# PGL / engine binaries (tracked as assets)
+!aether-android/**/assets/**.so
+!aether-android/**/assets/**.bin
+!aether-android/**/assets/**.pem
+
+# Extracted/decompiled APKs
+# (legacy extract dirs removed)
+
+
+# Build outputs
+.gradle/
+*.aar
+
+# IDE/Editor
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary
+tmp/
+temp/
+*.log
+
+# Build signing
+*.p12
+*.bat

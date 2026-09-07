@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- ───── Custom Signature Permission (Guard IPC) ───── -->
+    <permission
+        android:name="com.aether.engine.permission.IPC_ACCESS"
+        android:protectionLevel="signature"
+        android:label="@string/ipc_access_label"
+        android:description="@string/ipc_access_description" />
+
+    <!-- Core permissions -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.BIND_VPN_SERVICE"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="com.aether.engine.permission.IPC_ACCESS"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <!-- Android 13+ (API 33): daemon foreground notification -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <!-- Phase 1+2: AetherEngine runs in-process. No external game
+         launch, no getLaunchIntentForPackage. <queries> removed
+         because the engine never needs to inspect other packages. -->
+
+    <application
+        android:name="com.aether.engine.app.AetherApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="AetherEngine"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/LaunchTheme">
+
+        <!-- ─── MAIN PROCESS: UI Components ─── -->
+        <!-- Flutter v2 launcher Activity -->
+        <activity
+            android:name=".AetherHostActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Flutter embedding v2 -->
+        <meta-data android:name="flutterEmbedding" android:value="2" />
+
+ <!-- ─── :daemon PROCESS (เทียบเท่า :engine ของ the reference engine) ─── -->
+        <!-- SystemCallProvider (IPC gateway) — :daemon process -->
+        <provider
+            android:name="com.aether.engine.ipc.AetherSystemCallProvider"
+            android:authorities="com.aether.engine.ipc.SystemCallProvider"
+            android:exported="true"
+            android:permission="com.aether.engine.permission.IPC_ACCESS"
+            android:process=":daemon"/>
+
+        <!-- Daemon Foreground Service (:daemon) -->
+        <service
+            android:name="com.aether.engine.daemon.AetherDaemonService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            android:process=":daemon"/>
+
+        <service
+            android:name="com.aether.engine.daemon.AetherDaemonInnerService"
+            android:exported="false"
+            android:process=":daemon"/>
+
+        <!-- VPN Service (:daemon) -->
+        <service
+            android:name="com.aether.engine.vpn.AetherVpnService"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:exported="true"
+            android:process=":daemon"/>
+
+        <!-- ─── :p0–:p3 PROXY PROCESSES ─── -->
+        <!-- Multi-Process Proxy Activities (:p0–:p3) -->
+        <activity android:name="com.aether.engine.proxy.ProxyActivity$P0" android:exported="true" android:process=":p0" />
+        <activity android:name="com.aether.engine.proxy.ProxyActivity$P1" android:exported="true" android:process=":p1" />
+        <activity android:name="com.aether.engine.proxy.ProxyActivity$P2" android:exported="true" android:process=":p2" />
+        <activity android:name="com.aether.engine.proxy.ProxyActivity$P3" android:exported="true" android:process=":p3" />
+
+        <!-- TransparentProxyActivity (Aether-compatible) (:p0–:p3) -->
+        <activity android:name="com.aether.engine.proxy.TransparentProxyActivity$P0" android:exported="true" android:process=":p0" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.aether.engine.proxy.TransparentProxyActivity$P1" android:exported="true" android:process=":p1" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.aether.engine.proxy.TransparentProxyActivity$P2" android:exported="true" android:process=":p2" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.aether.engine.proxy.TransparentProxyActivity$P3" android:exported="true" android:process=":p3" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- ProxyPendingActivity (Aether-compatible) (:p0–:p3) -->
+        <activity android:name="com.aether.engine.proxy.ProxyPendingActivity$P0" android:exported="false" android:process=":p0" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.aether.engine.proxy.ProxyPendingActivity$P1" android:exported="false" android:process=":p1" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.aether.engine.proxy.ProxyPendingActivity$P2" android:exported="false" android:process=":p2" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.aether.engine.proxy.ProxyPendingActivity$P3" android:exported="false" android:process=":p3" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- InternalWebBrowser (in-app browser) -->
+        <activity android:name="com.aether.engine.proxy.InternalWebBrowser" android:exported="false" />
+
+        <!-- Multi-Process Proxy Services (:p0–:p3) -->
+        <service android:name="com.aether.engine.proxy.ProxyService$P0" android:exported="true" android:process=":p0" />
+        <service android:name="com.aether.engine.proxy.ProxyService$P1" android:exported="true" android:process=":p1" />
+        <service android:name="com.aether.engine.proxy.ProxyService$P2" android:exported="true" android:process=":p2" />
+        <service android:name="com.aether.engine.proxy.ProxyService$P3" android:exported="true" android:process=":p3" />
+
+        <!-- ProxyJobService (Aether-compatible) (:p0–:p3) -->
+        <service android:name="com.aether.engine.proxy.ProxyJobService$P0" android:exported="true" android:process=":p0" android:permission="android.permission.BIND_JOB_SERVICE" />
+        <service android:name="com.aether.engine.proxy.ProxyJobService$P1" android:exported="true" android:process=":p1" android:permission="android.permission.BIND_JOB_SERVICE" />
+        <service android:name="com.aether.engine.proxy.ProxyJobService$P2" android:exported="true" android:process=":p2" android:permission="android.permission.BIND_JOB_SERVICE" />
+        <service android:name="com.aether.engine.proxy.ProxyJobService$P3" android:exported="true" android:process=":p3" android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <!-- Multi-Process Content Providers (:p0–:p3) -->
+        <provider
+            android:name="com.aether.engine.proxy.ProxyContentProvider$P0"
+            android:authorities="com.aether.proxy.content.0"
+            android:exported="true"
+            android:process=":p0" />
+        <provider
+            android:name="com.aether.engine.proxy.ProxyContentProvider$P1"
+            android:authorities="com.aether.proxy.content.1"
+            android:exported="true"
+            android:process=":p1" />
+        <provider
+            android:name="com.aether.engine.proxy.ProxyContentProvider$P2"
+            android:authorities="com.aether.proxy.content.2"
+            android:exported="true"
+            android:process=":p2" />
+        <provider
+            android:name="com.aether.engine.proxy.ProxyContentProvider$P3"
+            android:authorities="com.aether.proxy.content.3"
+            android:exported="true"
+            android:process=":p3" />
+
+        <!-- AetherFileProvider (Aether-compatible: FileProvider) — MAIN PROCESS -->
+        <provider
+            android:name="com.aether.engine.proxy.AetherFileProvider"
+            android:authorities="com.aether.proxy.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Stub Broadcast Receiver — guarded by signature permission — MAIN PROCESS -->
+        <receiver
+            android:name="com.aether.engine.ipc.AetherStubReceiver"
+            android:exported="true"
+            android:enabled="true"
+            android:permission="com.aether.engine.permission.IPC_ACCESS">
+            <intent-filter>
+                <action android:name="com.aether.engine.STUB_RECEIVER"/>
+            </intent-filter>
+        </receiver>
+
+    </application>
+</manifest>

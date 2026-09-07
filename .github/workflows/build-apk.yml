@@ -1,0 +1,288 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Y2 optimization: cancel previous run if new commit pushed (save ~5 min)
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.3'
+          channel: 'stable'
+          cache: true
+
+      # ─── Android SDK + NDK cache (persist across runs) ───
+      # setup-android@v3 ติดตั้งที่ $ANDROID_SDK_ROOT หรือ $HOME/.android/sdk
+      # ไม่มี built-in cache → ต้องใช้ actions/cache@v4
+      # Key ตาม package set + workflow version (เปลี่ยน package = invalidate cache)
+      # Effect: build time ลดจาก ~21 min (cold) → ~6 min (warm)
+      - name: Cache Android SDK + NDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/sdk/cmdline-tools
+            ~/.android/sdk/platforms
+            ~/.android/sdk/platform-tools
+            ~/.android/sdk/build-tools
+            ~/.android/sdk/ndk
+          key: android-sdk-v1-cmdline12-platforms34-buildtools34-ndk26b
+          restore-keys: |
+            android-sdk-v1-
+
+      # Y2 optimization: Gradle build cache (compile outputs) — save 1-2 min
+      - name: Cache Gradle build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches/build-cache-1
+            ~/.gradle/caches/transforms-*
+            aether-core/build/.transforms
+            aether-android/aether-app/build/.transforms
+            aether-native/.cxx
+            app/build/.transforms
+          key: gradle-build-v2-${{ hashFiles('**/*.kt', '**/*.gradle*', '**/*.cpp', '**/*.hpp', '**/*.kts') }}
+          restore-keys: |
+            gradle-build-v2-
+
+      - name: Setup Android SDK & packages
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '12.0'
+          accept-android-sdk-licenses: true
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0 ndk;26.1.10909125'
+
+
+      # ─── Signing keystore: คงที่ข้าม build (ไม่สร้างใหม่ทุก run) ───
+      # cache เก็บเฉพาะ debug keystore; release key (KEYSTORE_BASE64) ใช้ path แยก ไม่เข้า cache
+      # หมายเหตุ: gradle ciRelease + apksigner ใช้ alias=androiddebugkey / pass=android
+      - name: Cache signing keystore (persist across runs)
+        uses: actions/cache@v4
+        with:
+          path: /tmp/aether-debug.jks
+          key: aether-debug-keystore-v1
+
+      - name: Restore or generate signing keystore (stable path)
+        run: |
+          set -e
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            # release key จาก secret — path แยก ไม่ยุ่งกับ cache
+            DK=/tmp/aether-secret.jks
+            echo "$KEYSTORE_BASE64" | base64 -d > "$DK"
+            echo "keystore: from KEYSTORE_BASE64 secret ($(stat -c%s "$DK") bytes)"
+          else
+            DK=/tmp/aether-debug.jks
+            if [ -s "$DK" ]; then
+              # cache hit — ใช้ key เดิม (signature คงที่ข้าม build)
+              echo "keystore: restored from cache ($(stat -c%s "$DK") bytes)"
+            else
+              # cache miss — สร้างครั้งเดียว แล้ว actions/cache จะเก็บให้ run ถัดไป
+              KEYTOOL="${JAVA_HOME}/bin/keytool"
+              if [ ! -x "$KEYTOOL" ]; then KEYTOOL="keytool"; fi
+              "$KEYTOOL" -genkeypair -v -keystore "$DK" -storepass android -keypass android \
+                -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+                -dname "CN=Android Debug,O=Android,C=US" 2>&1 | tail -1
+              echo "keystore: generated fresh ($(stat -c%s "$DK") bytes) — will be cached"
+            fi
+          fi
+          echo "ANDROID_DEBUG_KEYSTORE=$DK" >> $GITHUB_ENV
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+
+      - name: Pre-build validation (fast-fail gate)
+        run: |
+          set -e
+          echo "=== [1/2] Flutter analyze (static check, ~30s) ==="
+          (cd app && flutter analyze --no-fatal-infos --no-fatal-warnings)
+          echo ""
+          echo "=== [2/2] Kotlin + Native compile gate (~3min) ==="
+          ./gradlew --no-daemon --console=plain \
+            :aether-core:compileDebugKotlin \
+            :aether-android:compileDebugKotlin \
+            :aether-native:externalNativeBuildDebug
+          echo ""
+          echo "✅ Pre-build validation passed — proceeding to release build"
+          echo "   (If this gate fails, we skip the 8-min release build + save runner storage)"
+
+      - name: Build release APK (arm64-v8a only)
+        working-directory: ./app
+        run: |
+          set -e
+          flutter clean
+          rm -rf android/.gradle android/app/.gradle build
+          flutter pub get
+          flutter build apk --release --no-tree-shake-icons --obfuscate --split-debug-info=/tmp/flutter-symbols \
+            --target-platform android-arm64 --verbose 2>&1 | tee build.log
+        env:
+          FLUTTER_ROOT: /opt/hostedtoolcache/flutter
+          KEYSTORE_PASS: ${{ secrets.KEYSTORE_PASS }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.KEY_PASS }}
+
+      # Bulletproof: sign APK หลัง build ด้วย apksigner (ไม่พึ่ง gradle signing)
+      # เพราะ signingConfig.release ด้วย debug keystore ยัง unsigned (root cause = path/AGP)
+      # sign เฉพาะ flutter-apk/app-release.apk — ตัวเดียวกับที่ Locate/Release ใช้
+      # (ไม่ sign apk/release/ ที่ค้าง unsigned จาก gradle assembleRelease เก่า = นำของเก่าไม่มาใช้)
+      - name: Force-sign APK with apksigner (build-tools)
+        run: |
+          set -e
+          DK=/tmp/aether-debug.jks
+          if [ ! -f "$DK" ] || [ "$(stat -c%s "$DK" 2>/dev/null || echo 0)" = "0" ]; then
+            echo "ERROR: no keystore at $DK"
+            exit 1
+          fi
+          # ⚠️ ระบุ build-tools version ชัดเจน (34.0.0 ตาม setup) — ห้าม find | head -1
+          # เพราะ runner มี build-tools 36.1.0 ติดมา → sign แล้ว v2 verify fail → APK ติดตั้งไม่ได้
+          APKSIGNER="/usr/local/lib/android/sdk/build-tools/34.0.0/apksigner"
+          if [ ! -x "$APKSIGNER" ]; then
+            echo "::error::apksigner not found at $APKSIGNER (build-tools 34.0.0 ไม่ได้ติดตั้ง)"
+            exit 1
+          fi
+          echo "apksigner: $APKSIGNER"
+          # กำจัด apk/release ที่ค้าง (ของเก่า unsigned) — ไม่ให้มาปนกับของใหม่
+          rm -rf app/build/app/outputs/apk
+          # sign ตัวจริง: flutter-apk/app-release.apk
+          APK_FILE="app/build/app/outputs/flutter-apk/app-release.apk"
+          if [ ! -f "$APK_FILE" ]; then
+            echo "::error::flutter-apk/app-release.apk not found"
+            exit 1
+          fi
+          echo "Signing: $APK_FILE ($(du -h "$APK_FILE" | cut -f1))"
+          "$APKSIGNER" sign --ks "$DK" --ks-key-alias androiddebugkey \
+            --ks-pass pass:android --key-pass pass:android \
+            --v1-signing-enabled false \
+            --v2-signing-enabled true --v3-signing-enabled false --v4-signing-enabled false "$APK_FILE"
+          echo "Signed: $APK_FILE (v2 only — ตามต้นแบบแบบเดิม)"
+          # ✅ เกตตรวจสอบหลัง sign: v2 ต้อง verify ผ่าน — ห้ามปล่อย APK เสียขึ้น release
+          VERIFY_OUT=$("$APKSIGNER" verify --verbose "$APK_FILE" 2>&1)
+          echo "$VERIFY_OUT" | grep -E "Verified using v([1234])|DOES NOT VERIFY" || true
+          if ! echo "$VERIFY_OUT" | grep -q "Verified using v2 scheme"; then
+            echo "::error::APK signature DID NOT verify (no v2) — aborting"
+            exit 1
+          fi
+          echo "✅ APK signature verified (v2)"
+
+      - name: Locate built APK
+        id: apk
+        run: |
+          set -e
+          echo "=== APK output search ==="
+          find app/build/app/outputs/flutter-apk -name "*.apk" -type f 2>/dev/null || true
+          # ใช้ flutter-apk/ เป็น source of truth (ตัวที่ flutter build ผลิตจริง + ที่ sign)
+          # hard-fail ถ้าไม่เจอ (ไม่ fallback ไป apk/release เก่า = วนลูป)
+          APK_FILE="app/build/app/outputs/flutter-apk/app-release.apk"
+          if [ ! -f "$APK_FILE" ]; then
+            # hard-fail: ไม่ fallback (ห้ามวนกลับไป apk/release/ เก่า unsigned)
+            echo "::error::flutter-apk/app-release.apk not found after build"
+            exit 1
+          fi
+          echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
+          echo "Found: $APK_FILE ($(du -h "$APK_FILE" | cut -f1))"
+          mkdir -p /tmp/apk
+          cp "$APK_FILE" /tmp/apk/app-release.apk
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep -E "^\s*versionName\s*=" app/android/app/build.gradle | head -n1 | sed "s/.*=\s*\"\(.*\)\".*/\1/")
+          echo "version=$VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+
+      - name: Upload APK artifact (best-effort)
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: app-apk
+          path: /tmp/apk/app-release.apk
+          retention-days: 1
+
+      - name: Upload build log artifact (best-effort)
+        if: always()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: build-log
+          path: app/build.log
+          retention-days: 1
+          if-no-files-found: ignore
+
+      - name: Create or update GitHub Release (upload APK)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="apk-v${VERSION}"
+          APK_FILE="/tmp/apk/app-release.apk"
+          echo "Release flow: tag=$TAG apk=$APK_FILE ($(du -h "$APK_FILE" | cut -f1))"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG exists — replace asset via REST API (gh CLI has cache race)"
+            # ดึง asset ID จาก API ตรง (ไม่ใช้ gh CLI cache)
+            REPO_INFO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+            ASSET_IDS=$(curl -sL -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO_INFO/releases/tags/$TAG" \
+              | python3 -c "import json,sys; r=json.load(sys.stdin); print('\n'.join(str(a['id']) for a in r.get('assets',[])))")
+            for aid in $ASSET_IDS; do
+              echo "deleting asset $aid via API"
+              curl -sX DELETE -H "Authorization: token $GH_TOKEN" \
+                "https://api.github.com/repos/$REPO_INFO/releases/assets/$aid" \
+                -o /dev/null -w "  HTTP: %{http_code}\n"
+            done
+            sleep 5  # ให้ cache + storage layer refresh
+            # upload ใหม่ผ่าน API ตรง (ไม่ใช้ gh CLI)
+            RELEASE_ID=$(curl -sL -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO_INFO/releases/tags/$TAG" \
+              | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+            curl -sX POST \
+              -H "Authorization: token $GH_TOKEN" \
+              -H "Content-Type: application/vnd.android.package-archive" \
+              --data-binary @"$APK_FILE" \
+              "https://uploads.github.com/repos/$REPO_INFO/releases/$RELEASE_ID/assets?name=app-release.apk" \
+              -o /tmp/release_upload.json -w "  upload HTTP: %{http_code}\n"
+            cat /tmp/release_upload.json | python3 -c "import json,sys; d=json.load(sys.stdin); print(f\"  -> id={d.get('id')} size={d.get('size')} state={d.get('state')}\")"
+          else
+            echo "Creating release $TAG"
+            gh release create "$TAG" "$APK_FILE" \
+              --title "AetherEngine APK v${VERSION}" \
+              --notes "Automated release build from CI: ${VERSION}" \
+              --prerelease
+          fi
+          # ✅ verify asset uploaded + size ตรง APK_FILE
+          sleep 3
+          REPO_INFO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+          ASSET_SIZE=$(curl -sL -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO_INFO/releases/tags/$TAG" \
+            | python3 -c "import json,sys; r=json.load(sys.stdin); print(sum(a['size'] for a in r.get('assets',[]) if a['name']=='app-release.apk'))")
+          LOCAL_SIZE=$(stat -c%s "$APK_FILE")
+          echo "Asset size: uploaded=$ASSET_SIZE local=$LOCAL_SIZE"
+          if [ "$ASSET_SIZE" != "$LOCAL_SIZE" ]; then
+            echo "::error::Asset size mismatch — release broken"
+            exit 1
+          fi
+          echo "✅ Release asset verified ($ASSET_SIZE bytes)"
+          echo "=== Release assets ==="
+          curl -sL -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO_INFO/releases/tags/$TAG" \
+            | python3 -c "import json,sys; r=json.load(sys.stdin); [print(f\"  {a['name']} ({a['size']} B)\") for a in r.get('assets',[])]"

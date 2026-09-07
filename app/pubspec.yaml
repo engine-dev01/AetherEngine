@@ -1,0 +1,30 @@
+name: aether
+description: "AetherEngine Phantom UI Shell"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_svg: ^2.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/social/discord.svg
+    - assets/social/facebook.svg
+    - assets/social/link.svg
+    - assets/social/telegram.svg
+    - assets/social/whatsapp.svg
+    - assets/fonts/fa-light-300.woff
+    - assets/fonts/fa-regular-400.woff
+    - assets/fonts/fa-solid-900.woff
+    - assets/fonts/slick.ttf

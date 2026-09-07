@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ───── Custom Signature Permission (Guard IPC) ───── -->
+    <permission
+        android:name="com.aether.engine.permission.IPC_ACCESS"
+        android:protectionLevel="signature"
+        android:label="@string/ipc_access_label"
+        android:description="@string/ipc_access_description" />
+
+    <!-- Permissions — 117 entries (AetherEngine base profile) -->
+    <uses-permission android:name="android.permission.ACCESS_ADSERVICES_AD_ID"/>
+    <uses-permission android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION"/>
+    <uses-permission android:name="android.permission.ACCESS_CACHE_FILESYSTEM"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_DOWNLOAD_MANAGER"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_GPS"/>
+    <uses-permission android:name="android.permission.ACCESS_LOCATION_EXTRA_COMMANDS"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_WIMAX_STATE"/>
+    <uses-permission android:name="android.permission.ACCOUNT_MANAGER"/>
+    <uses-permission android:name="android.permission.AUTHENTICATE_ACCOUNTS"/>
+    <uses-permission android:name="android.permission.BATTERY_STATS"/>
+    <uses-permission android:name="android.permission.BIND_APPWIDGET"/>
+    <uses-permission android:name="android.permission.BIND_DIRECTORY_SEARCH"/>
+    <uses-permission android:name="android.permission.BIND_EXTERNAL_SERVICE"/>
+    <uses-permission android:name="android.permission.BIND_JOB_SERVICE"/>
+    <uses-permission android:name="android.permission.BIND_VPN_SERVICE"/>
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"/>
+    <uses-permission android:name="android.permission.BODY_SENSORS"/>
+    <uses-permission android:name="android.permission.BROADCAST_SMS"/>
+    <uses-permission android:name="android.permission.BROADCAST_STICKY"/>
+    <uses-permission android:name="android.permission.BROADCAST_WAP_PUSH"/>
+    <uses-permission android:name="android.permission.CALL_PHONE"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.CHANGE_CONFIGURATION"/>
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.CHANGE_WIMAX_STATE"/>
+    <uses-permission android:name="android.permission.CLEAR_APP_CACHE"/>
+    <uses-permission android:name="android.permission.CLEAR_APP_USER_DATA"/>
+    <uses-permission android:name="android.permission.CREDENTIAL_MANAGER_SET_ALLOWED_PROVIDERS"/>
+    <uses-permission android:name="android.permission.DELETE_PACKAGES"/>
+    <uses-permission android:name="android.permission.DETECT_SCREEN_CAPTURE"/>
+    <uses-permission android:name="android.permission.DEVICE_POWER"/>
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD"/>
+    <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION"/>
+    <uses-permission android:name="android.permission.DUMP"/>
+    <uses-permission android:name="android.permission.EXPAND_STATUS_BAR"/>
+    <uses-permission android:name="android.permission.FLASHLIGHT"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <uses-permission android:name="android.permission.GET_ACCOUNTS"/>
+    <uses-permission android:name="android.permission.GET_CLIPS"/>
+    <uses-permission android:name="android.permission.GET_INTENT_SENDER_INTENT"/>
+    <uses-permission android:name="android.permission.GET_PACKAGE_SIZE"/>
+    <uses-permission android:name="android.permission.GET_TASKS"/>
+    <uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS"/>
+    <uses-permission android:name="android.permission.INSTALL_PACKAGES"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES"/>
+    <uses-permission android:name="android.permission.MANAGE_ACCOUNTS"/>
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <uses-permission android:name="android.permission.MOUNT_UNMOUNT_FILESYSTEMS"/>
+    <uses-permission android:name="android.permission.NFC"/>
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"/>
+    <uses-permission android:name="android.permission.PERSISTENT_ACTIVITY"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.PROCESS_OUTGOING_CALLS"/>
+    <uses-permission android:name="android.permission.QUERY_ADVANCED_PROTECTION_MODE"/>
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
+    <uses-permission android:name="android.permission.READ_APP_BADGE"/>
+    <uses-permission android:name="android.permission.READ_CALENDAR"/>
+    <uses-permission android:name="android.permission.READ_CALL_LOG"/>
+    <uses-permission android:name="android.permission.READ_CELL_BROADCASTS"/>
+    <uses-permission android:name="android.permission.READ_CLIPS"/>
+    <uses-permission android:name="android.permission.READ_CONTACTS"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_INSTALL_SESSIONS"/>
+    <uses-permission android:name="android.permission.READ_LOGS"/>
+    <uses-permission android:name="android.permission.READ_OWNER_DATA"/>
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <uses-permission android:name="android.permission.READ_PROFILE"/>
+    <uses-permission android:name="android.permission.READ_SOCIAL_STREAM"/>
+    <uses-permission android:name="android.permission.READ_SYNC_SETTINGS"/>
+    <uses-permission android:name="android.permission.READ_SYNC_STATS"/>
+    <uses-permission android:name="android.permission.READ_USER_DICTIONARY"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.REORDER_TASKS"/>
+    <uses-permission android:name="android.permission.RESTART_PACKAGES"/>
+    <uses-permission android:name="android.permission.SEND_RESPOND_VIA_MESSAGE"/>
+    <uses-permission android:name="android.permission.SEND_SMS"/>
+    <uses-permission android:name="android.permission.SET_TIME"/>
+    <uses-permission android:name="android.permission.SET_TIME_ZONE"/>
+    <uses-permission android:name="android.permission.SET_WALLPAPER"/>
+    <uses-permission android:name="android.permission.SET_WALLPAPER_HINTS"/>
+    <uses-permission android:name="android.permission.SUBSCRIBED_FEEDS_READ"/>
+    <uses-permission android:name="android.permission.SUBSCRIBED_FEEDS_WRITE"/>
+    <uses-permission android:name="android.permission.TRANSMIT_IR"/>
+    <uses-permission android:name="android.permission.UPDATE_APP_OPS_STATS"/>
+    <uses-permission android:name="android.permission.USE_CREDENTIALS"/>
+    <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
+    <uses-permission android:name="android.permission.USE_SIP"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.WRITE_CALENDAR"/>
+    <uses-permission android:name="android.permission.WRITE_CALL_LOG"/>
+    <uses-permission android:name="android.permission.WRITE_CLIPS"/>
+    <uses-permission android:name="android.permission.WRITE_CONTACTS"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_MEDIA_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_OWNER_DATA"/>
+    <uses-permission android:name="android.permission.WRITE_PROFILE"/>
+    <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
+    <uses-permission android:name="android.permission.WRITE_SOCIAL_STREAM"/>
+    <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS"/>
+    <uses-permission android:name="android.permission.WRITE_USER_DICTIONARY"/>
+    <uses-permission android:name="com.sec.android.permission.LAUNCH_PERSONAL_PAGE_SERVICE"/>
+    <uses-permission android:name="com.sec.android.permission.VOIP_INTERFACE"/>
+    <uses-permission android:name="sec.android.permission.READ_MSG_PREF"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="com.aether.engine.permission.IPC_ACCESS"/>
+
+    <!-- Phase 8 — Android 11+ package visibility (REQUIRED for createPackageContext enumeration) -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- virtual-app targets: allow querying any installed package's
+             components (launcher/providers) for in-process virtualization.
+             QUERY_ALL_PACKAGES already granted; this <queries> makes
+             getPackageInfo/getLaunchIntentForPackage resolve on API 30+. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN"/>
+        </intent>
+    </queries>
+
+    <!-- App-level attributes (name/icon/theme/label) ถูกกำหนดโดย host APK
+         (app manifest) — module นี้ประกาศเฉพาะ engine components -->
+    <application
+        android:vmSafeMode="true"
+        android:appComponentFactory="androidx.core.app.CoreComponentFactory">
+
+        <!-- AetherHostActivity อยู่ที่ app/ (Flutter module) — launcher จริง
+             ไม่ประกาศที่นี่ (module นี้คือ library ที่ให้ services) -->
+
+        <!-- ─── Multi-Process Proxy Activities (:p0–:p3) ─── -->
+        <activity android:name="com.aether.engine.proxy.ProxyActivity$P0" android:exported="true" android:process=":p0" />
+        <activity android:name="com.aether.engine.proxy.ProxyActivity$P1" android:exported="true" android:process=":p1" />
+        <activity android:name="com.aether.engine.proxy.ProxyActivity$P2" android:exported="true" android:process=":p2" />
+        <activity android:name="com.aether.engine.proxy.ProxyActivity$P3" android:exported="true" android:process=":p3" />
+
+        <!-- TransparentProxyActivity (Aether-compatible) (:p0–:p3) -->
+        <activity android:name="com.aether.engine.proxy.TransparentProxyActivity$P0" android:exported="true" android:process=":p0" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.aether.engine.proxy.TransparentProxyActivity$P1" android:exported="true" android:process=":p1" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.aether.engine.proxy.TransparentProxyActivity$P2" android:exported="true" android:process=":p2" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.aether.engine.proxy.TransparentProxyActivity$P3" android:exported="true" android:process=":p3" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- ProxyPendingActivity (Aether-compatible) (:p0–:p3) -->
+        <activity android:name="com.aether.engine.proxy.ProxyPendingActivity$P0" android:exported="false" android:process=":p0" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.aether.engine.proxy.ProxyPendingActivity$P1" android:exported="false" android:process=":p1" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.aether.engine.proxy.ProxyPendingActivity$P2" android:exported="false" android:process=":p2" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.aether.engine.proxy.ProxyPendingActivity$P3" android:exported="false" android:process=":p3" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- InternalWebBrowser (in-app browser) -->
+        <activity android:name="com.aether.engine.proxy.InternalWebBrowser" android:exported="false" />
+
+        <!-- ─── Multi-Process Proxy Services (:p0–:p3) ─── -->
+        <service android:name="com.aether.engine.proxy.ProxyService$P0" android:exported="true" android:process=":p0" />
+        <service android:name="com.aether.engine.proxy.ProxyService$P1" android:exported="true" android:process=":p1" />
+        <service android:name="com.aether.engine.proxy.ProxyService$P2" android:exported="true" android:process=":p2" />
+        <service android:name="com.aether.engine.proxy.ProxyService$P3" android:exported="true" android:process=":p3" />
+
+        <!-- ProxyJobService (Aether-compatible) (:p0–:p3) -->
+        <service android:name="com.aether.engine.proxy.ProxyJobService$P0" android:exported="true" android:process=":p0" android:permission="android.permission.BIND_JOB_SERVICE" />
+        <service android:name="com.aether.engine.proxy.ProxyJobService$P1" android:exported="true" android:process=":p1" android:permission="android.permission.BIND_JOB_SERVICE" />
+        <service android:name="com.aether.engine.proxy.ProxyJobService$P2" android:exported="true" android:process=":p2" android:permission="android.permission.BIND_JOB_SERVICE" />
+        <service android:name="com.aether.engine.proxy.ProxyJobService$P3" android:exported="true" android:process=":p3" android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <!-- CustomTabsProxyService --><!-- REMOVED: not in AetherEngine blueprint -->
+        <!-- FakeCustomTabsService --><!-- REMOVED: not in AetherEngine blueprint -->
+
+        <!-- ─── Multi-Process Content Providers (:p0–:p3) ─── -->
+        <provider
+            android:name="com.aether.engine.proxy.ProxyContentProvider$P0"
+            android:authorities="com.aether.proxy.content.0"
+            android:exported="true"
+            android:process=":p0" />
+        <provider
+            android:name="com.aether.engine.proxy.ProxyContentProvider$P1"
+            android:authorities="com.aether.proxy.content.1"
+            android:exported="true"
+            android:process=":p1" />
+        <provider
+            android:name="com.aether.engine.proxy.ProxyContentProvider$P2"
+            android:authorities="com.aether.proxy.content.2"
+            android:exported="true"
+            android:process=":p2" />
+        <provider
+            android:name="com.aether.engine.proxy.ProxyContentProvider$P3"
+            android:authorities="com.aether.proxy.content.3"
+            android:exported="true"
+            android:process=":p3" />
+
+        <!-- SystemCallProvider (IPC gateway) — :daemon process -->
+        <provider
+            android:name="com.aether.engine.ipc.AetherSystemCallProvider"
+            android:authorities="com.aether.engine.ipc.SystemCallProvider"
+            android:exported="true"
+            android:permission="com.aether.engine.permission.IPC_ACCESS"
+            android:process=":daemon"/>
+
+        <!-- AetherFileProvider (Aether-compatible: FileProvider) -->
+        <provider
+            android:name="com.aether.engine.proxy.AetherFileProvider"
+            android:authorities="com.aether.proxy.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Daemon Foreground Service (:daemon) -->
+        <service
+            android:name="com.aether.engine.daemon.AetherDaemonService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            android:process=":daemon"/>
+
+        <service
+            android:name="com.aether.engine.daemon.AetherDaemonInnerService"
+            android:exported="false"
+            android:process=":daemon"/>
+
+        <!-- VPN Service (:daemon) — moved from :vpn to :daemon per blueprint parity -->
+        <service
+            android:name="com.aether.engine.vpn.AetherVpnService"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:exported="true"
+            android:process=":daemon"/>
+
+        <!-- Stub Broadcast Receiver — guarded by signature permission -->
+        <receiver
+            android:name="com.aether.engine.ipc.AetherStubReceiver"
+            android:exported="true"
+            android:enabled="true"
+            android:permission="com.aether.engine.permission.IPC_ACCESS">
+            <intent-filter>
+                <action android:name="com.aether.engine.STUB_RECEIVER"/>
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
