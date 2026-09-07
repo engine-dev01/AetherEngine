@@ -469,7 +469,7 @@ class GuestRuntime private constructor(
                         val parcel = android.os.Parcel.obtain()
                         try {
                             appInfo.writeToParcel(parcel, 0)
-                            parcel.setPosition(0)
+                            parcel.setDataPosition(0)
                             val copy = ApplicationInfo.CREATOR.createFromParcel(parcel)
                             copy.dataDir = dataDir.absolutePath
                             setFieldB(loadedApk, "applicationInfo", copy)
