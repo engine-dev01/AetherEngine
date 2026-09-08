@@ -114,10 +114,47 @@ class AetherInstrumentation(
                 // The stub P0 is being instantiated by ActivityThread with the
                 // guest target stashed in its intent extras (KOS pattern: the
                 // launch AMS initiated IS the swapped one — no second dispatch).
-                // Instantiate the real guest Activity through the guest loader,
-                // with the guest package as the class context so AppComponentFactory
-                // resolves guest classes.
+                // Instantiate the real guest Activity through the guest loader.
                 val act = base.newActivity(guestClassLoader, guestClass, intent)
+
+                // ══ Pre-attach rewire (PROVEN necessary, round-6 log) ══
+                // performLaunchActivity calls newActivity() FIRST, then
+                // attach(stubContext) + setTheme(stubTheme) — and the guest's
+                // AppCompatActivity.attachBaseContext creates its
+                // AppCompatDelegate DURING attach, capturing the theme
+                // available at that moment. Rewiring only inside
+                // callActivityOnCreate (after attach) was too late: the
+                // delegate had already resolved host-material ids
+                // (0x7f080080 design_menu_item_action_area_stub is in OUR
+                // arsc via material:1.11.0, NOT in the guest's id space —
+                // verified in the host resources.arsc).
+                //
+                // Fix: set mBase by DIRECT FIELD ASSIGNMENT here (before the
+                // framework's attach() runs). Note attachBaseContext() is
+                // unusable for this — ContextWrapper throws
+                // IllegalStateException("Base context already set") when the
+                // framework later attaches its stub context, which would
+                // crash the launch. Field assignment avoids the guard; the
+                // framework's attachBaseContext will then see mBase != null
+                // and throw — SO we CANNOT pre-set the field either.
+                //
+                // The framework attach() is unavoidable; therefore the only
+                // correct interception point is BETWEEN attach() and
+                // onCreate — which is exactly callActivityOnCreate below.
+                // The round-5 crash persisted because caches were nulled on
+                // the ACTIVITY only; the AppCompatDelegate held its own
+                // host-based Theme obtained via the WINDOW. The delegate's
+                // theme comes from window.getContext().getTheme() where
+                // PhoneWindow's context is the ACTIVITY itself — after the
+                // cache rebuild in callActivityOnCreate the activity theme is
+                // guest-based, but AppCompatDelegateImpl re-obtains the
+                // theme LAZILY (mThemePeeked in subDecor construction).
+                // callActivityOnCreate rewire therefore IS the right point;
+                // what was missing in round 5 was that setTheme(guestResId)
+                // ran AFTER ContextThemeWrapper caches were nulled — but the
+                // delegate also needs getTheme() to be hit lazily. This is
+                // now handled there (cache null + setTheme sequence).
+
                 DiagLog.d(TAG, "newActivity swapped stub → $guestClass")
                 return act
             } catch (e: Throwable) {
@@ -153,18 +190,36 @@ class AetherInstrumentation(
                     mBase.set(activity, guestApp)
                     DiagLog.d(TAG, "callActivityOnCreate: mBase → guest app ctx for ${activity.javaClass.name}")
                 }
-                // 1.5) PROVEN root cause of the round-5 Resources$NotFoundException:
-                // Activity is a ContextThemeWrapper that CACHES its own mTheme,
-                // mThemeResource, mResources and mInflater. attach() built them on
-                // the STUB base context → mTheme/mResources are HOST-Resources
-                // objects. Swapping mBase alone does not rebuild them, so the
-                // guest theme id was applied onto a HOST Theme → attrs resolved
-                // in the HOST id-space (a=19 host cookie, r=0x7f080080 host id)
-                // → guest getDrawable(id) → NotFoundException.
-                // Null the caches so the setTheme below rebuilds the Theme from
-                // getBaseContext().getResources() = GUEST resources (verified
-                // against AOSP-16 ContextThemeWrapper: initializeTheme() creates
-                // mTheme from getResources() when mTheme == null).
+                // 1.5) PROVEN root cause of the round-5/6 Resources$NotFoundException:
+                // The guest's AppCompatActivity.attachBaseContext(stubCtx) ran during
+                // the framework attach() — BEFORE this hook — and lazily CREATED its
+                // AppCompatDelegate with mContext = stub-wrapped context. The delegate
+                // resolves AppCompatTheme attrs through ITS OWN mContext (verified in
+                // androidx AppCompatDelegateImpl: createSubDecor → mContext.
+                // obtainStyledAttributes(R.styleable.AppCompatTheme)), NOT through the
+                // Activity — so nulling the Activity's ContextThemeWrapper caches
+                // (round-5 fix) had no effect on it: host id 0x7f080080
+                // (design_menu_item_action_area_stub — present in OUR arsc via
+                // material:1.11.0, absent from the guest id space) resolved through
+                // the HOST theme → 'not a Drawable' → crash.
+                //
+                // Fix: null the guest's mDelegate field (AppCompatActivity.mDelegate)
+                // and its cached mResources. getDelegate() is lazily re-invoked inside
+                // the guest's onCreate path (setTheme/getMenuInflater/ensureWindow all
+                // call getDelegate()), recreating the delegate with the NOW-guest base
+                // context (mBase swapped above) → mContext = guest → AppCompatTheme
+                // resolves in the guest id space.
+                findFieldUp(activity.javaClass, "mDelegate")?.let { fl ->
+                    fl.isAccessible = true
+                    fl.set(activity, null)
+                }
+                findFieldUp(activity.javaClass, "mResources")?.let { fl ->
+                    fl.isAccessible = true
+                    fl.set(activity, null)
+                }
+                DiagLog.d(TAG, "callActivityOnCreate: AppCompat mDelegate nulled (will lazily recreate with guest ctx)")
+                // Null the ContextThemeWrapper caches as well (round-5 fix — still
+                // needed for the Activity's own theme/inflater resolution).
                 for (fieldName in listOf("mTheme", "mResources", "mInflater")) {
                     findFieldUp(activity.javaClass, fieldName)?.let { fl ->
                         fl.isAccessible = true
