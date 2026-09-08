@@ -109,6 +109,12 @@ class AetherInstrumentation(
         val guestClass = intent?.getStringExtra(EXTRA_GUEST_CLASS)
         if (guestClass != null && className == stubComponent) {
             try {
+                // The stub P0 is being instantiated by ActivityThread with the
+                // guest target stashed in its intent extras (KOS pattern: the
+                // launch AMS initiated IS the swapped one — no second dispatch).
+                // Instantiate the real guest Activity through the guest loader,
+                // with the guest package as the class context so AppComponentFactory
+                // resolves guest classes.
                 val act = base.newActivity(guestClassLoader, guestClass, intent)
                 DiagLog.d(TAG, "newActivity swapped stub → $guestClass")
                 return act

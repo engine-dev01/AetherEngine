@@ -75,6 +75,17 @@ open class ProxyActivity : Activity() {
         //    (jv0.O2 port). Isolated here so a guest crash cannot take down the
         //    main UI process. Firewall contains guest background-thread crashes.
         if (isVirtual) {
+            // RELAUNCH (2nd onCreate after recreate()): the intent already
+            // carries the guest extras — AetherInstrumentation.newActivity has
+            // ALREADY swapped this instance to the real guest Activity class.
+            // Guard so we never re-run the bootstrap (which would loop).
+            // Note: if this code is reached with extras present, the swap did
+            // not happen (hook missing) — finish to avoid a blank stub.
+            if (intent.getStringExtra(AetherInstrumentation.EXTRA_GUEST_CLASS) != null) {
+                DiagLog.d("ProxyActivity", "relaunch reached bootstrap — swap did not happen; finishing")
+                finish()
+                return
+            }
             installGuestThreadFirewall()
             var launched = false
             try {
@@ -112,23 +123,53 @@ open class ProxyActivity : Activity() {
                         guestApp = res.loadedApplication,
                     )
                     DiagLog.d("ProxyActivity", "AetherInstrumentation.install → $hooked")
-                    launched = startGuestActivity(targetPkg, gm.launcher)
+                    // KOS-verified pattern: do NOT dispatch a SECOND P0 instance.
+                    // In the KOS reference the FIRST (and only) P0 activity launch is
+                    // the one that gets swapped to the guest ('newActivity: instantiated
+                    // through guest AppComponentFactory' appears exactly once, for the
+                    // launch that AMS initiated in response to the user tapping play).
+                    // Our second startActivity from an activity that is finishing was
+                    // never dispatched by AMS (verified: 0 framework logs after it).
+                    // Instead: rewrite THIS activity's intent extras so the guest
+                    // target is carried on the CURRENT instance, then trigger the
+                    // relaunch-in-place that AMS already knows about.
+                    intent.putExtra(AetherInstrumentation.EXTRA_GUEST_CLASS, gm.launcher)
+                    intent.putExtra(AetherInstrumentation.EXTRA_GUEST_INTENT, targetPkg)
+                    DiagLog.d("ProxyActivity",
+                        "guest target carried on bootstrap P0 intent: $targetPkg/${gm.launcher}")
+                    launched = true
+                    // The actual instantiation happens on relaunch: the bootstrap
+                    // instance finishes, AMS relaunches P0 (standard singleTop-style
+                    // recreation), and AetherInstrumentation.newActivity swaps it
+                    // to the guest class via the extras above.
                 }
             } catch (e: Throwable) {
                 DiagLog.err("ProxyActivity", "guest launch exception", e)
             }
             // dump full process logcat (framework + our traces) for post-mortem.
-            // Delay first: AMS launch + activity create + onCreate take >500ms
-            // (KOS reference: ~1.5s from dispatch to 'Activity Created!').
-            // Dumping at +41ms cut the trace off right at the interesting part.
-            try {
-                Thread.sleep(1500)
-            } catch (ie: InterruptedException) { /* keep going */ }
-            DiagLog.dumpLogcat("after guest launch (launched=$launched)")
-            // Finish the bootstrap instance either way: on success the stub
-            // relaunch (swapped to the real guest activity by newActivity)
-            // replaces it on the backstack; on failure there is nothing to show.
-            finish()
+            // NOTE: run on a background thread — Thread.sleep on main would block
+            // the Looper for 1.5s right when AMS delivers the launch message
+            // (verified: 0 log lines for the whole window after dispatch, the
+            // swap never ran, UI bounced back).
+            Thread {
+                try {
+                    Thread.sleep(1500)
+                } catch (ie: InterruptedException) { /* keep go */ }
+                DiagLog.dumpLogcat("after guest launch (launched=$launched)")
+            }.start()
+            if (launched) {
+                // Relaunch THIS instance through the framework: recreate() runs
+                // the normal activity lifecycle (onDestroy → onCreate) WITHOUT a
+                // second AMS dispatch — ActivityThread.handleRelaunchActivity
+                // calls Instrumentation.newActivity with the SAME intent (which
+                // now carries the guest extras) → the hook swaps stub → guest.
+                // This is the single-launch swap the KOS reference performs.
+                DiagLog.d("ProxyActivity", "recreate() → relaunch with guest extras")
+                runOnUiThread { recreate() }
+            } else {
+                // Launch failed — nothing to show, close the bootstrap instance.
+                finish()
+            }
             return
         }
 
