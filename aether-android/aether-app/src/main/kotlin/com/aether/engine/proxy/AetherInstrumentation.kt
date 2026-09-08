@@ -5,6 +5,8 @@ import android.app.Application
 import android.app.Instrumentation
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.IBinder
 
@@ -128,27 +130,66 @@ class AetherInstrumentation(
     }
 
     override fun callActivityOnCreate(activity: Activity, icicle: Bundle?) {
-        // KOS-equivalent 'Installed guest ActivityInfo before onCreate': when
-        // the swapped guest activity is being created, its package/resource
-        // wiring must point at the GUEST, not the stub/host. The swapped guest
-        // Activity was instantiated with the guest classloader, but its base
-        // context is the STUB's (package com.aether) — swap mBase to the guest
-        // app context so getPackageName()/getResources()/theme resolve as the
-        // guest while the window + token (already created) remain intact.
+        // KOS-equivalent 'Installed guest ActivityInfo before onCreate'.
+        //
+        // Framework flow (verified in AOSP ActivityThread.performLaunchActivity):
+        //   attach() sets Activity.mActivityInfo = r.activityInfo (the STUB's
+        //   ActivityInfo from OUR manifest) → setTheme(r.activityInfo.
+        //   getThemeResource()) → the guest activity then inflates its layout
+        //   through the HOST theme/resource table → 'Resources$NotFoundException
+        //   design_menu_item_action_area_stub' (host id 0x7f080080 is not a
+        //   drawable in the guest's resource space).
+        //
+        // Fix: before onCreate, install the GUEST's real ActivityInfo (its own
+        // theme, softInputMode, uiOptions, flags...) and re-apply the guest
+        // theme so getResources()/getTheme() resolve in the guest's space.
         try {
             if (guestApp != null && activity.javaClass.name != stubComponent &&
                 activity.packageName != guestApp.packageName) {
+                // 1) mBase → guest app context (package, resources, classloader)
                 val mBase = findFieldUp(activity.javaClass, "mBase")
                 if (mBase != null) {
                     mBase.isAccessible = true
                     mBase.set(activity, guestApp)
                     DiagLog.d(TAG, "callActivityOnCreate: mBase → guest app ctx for ${activity.javaClass.name}")
                 }
+                // 2) mActivityInfo → guest ActivityInfo (theme, flags, metadata)
+                val guestInfo = resolveGuestActivityInfo(activity.javaClass.name)
+                if (guestInfo != null) {
+                    val f = findFieldUp(activity.javaClass, "mActivityInfo")
+                    if (f != null) {
+                        f.isAccessible = true
+                        f.set(activity, guestInfo)
+                        // Re-apply the GUEST theme — attach() already applied the
+                        // STUB's; the guest layout depends on its own attributes.
+                        val themeRes = guestInfo.theme
+                        if (themeRes != 0) {
+                            activity.setTheme(themeRes)
+                        }
+                        DiagLog.d(TAG, "callActivityOnCreate: guest ActivityInfo installed " +
+                            "(theme=0x${Integer.toHexString(guestInfo.theme)}) for ${activity.javaClass.name}")
+                    }
+                }
             }
         } catch (e: Throwable) {
             DiagLog.d(TAG, "pre-onCreate rewire: ${e.message}")
         }
         base.callActivityOnCreate(activity, icicle)
+    }
+
+    /** Resolve the guest's real ActivityInfo from the guest PackageManager. */
+    private fun resolveGuestActivityInfo(activityClass: String): ActivityInfo? {
+        return try {
+            val pm = guestApp?.packageManager ?: return null
+            val pkg = guestApp?.packageName ?: return null
+            val pi = pm.getPackageInfo(pkg, PackageManager.GET_ACTIVITIES)
+            pi.activities?.firstOrNull { it.name == activityClass }
+                // fall back to the launcher's info (theme usually app-wide)
+                ?: pi.activities?.firstOrNull { it.name.contains("Activity") }
+        } catch (e: Throwable) {
+            DiagLog.d(TAG, "resolveGuestActivityInfo: ${e.message}")
+            null
+        }
     }
 
     private fun findFieldUp(start: Class<*>, name: String): java.lang.reflect.Field? {
