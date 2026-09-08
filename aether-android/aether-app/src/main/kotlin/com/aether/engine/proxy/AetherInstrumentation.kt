@@ -153,6 +153,29 @@ class AetherInstrumentation(
                     mBase.set(activity, guestApp)
                     DiagLog.d(TAG, "callActivityOnCreate: mBase → guest app ctx for ${activity.javaClass.name}")
                 }
+                // 1.5) PROVEN root cause of the round-5 Resources$NotFoundException:
+                // Activity is a ContextThemeWrapper that CACHES its own mTheme,
+                // mThemeResource, mResources and mInflater. attach() built them on
+                // the STUB base context → mTheme/mResources are HOST-Resources
+                // objects. Swapping mBase alone does not rebuild them, so the
+                // guest theme id was applied onto a HOST Theme → attrs resolved
+                // in the HOST id-space (a=19 host cookie, r=0x7f080080 host id)
+                // → guest getDrawable(id) → NotFoundException.
+                // Null the caches so the setTheme below rebuilds the Theme from
+                // getBaseContext().getResources() = GUEST resources (verified
+                // against AOSP-16 ContextThemeWrapper: initializeTheme() creates
+                // mTheme from getResources() when mTheme == null).
+                for (fieldName in listOf("mTheme", "mResources", "mInflater")) {
+                    findFieldUp(activity.javaClass, fieldName)?.let { fl ->
+                        fl.isAccessible = true
+                        fl.set(activity, null)
+                    }
+                }
+                findFieldUp(activity.javaClass, "mThemeResource")?.let { fl ->
+                    fl.isAccessible = true
+                    fl.set(activity, 0)
+                }
+                DiagLog.d(TAG, "callActivityOnCreate: ContextThemeWrapper caches cleared (mTheme/mResources/mInflater/mThemeResource)")
                 // 2) mActivityInfo → guest ActivityInfo (theme, flags, metadata)
                 val guestInfo = resolveGuestActivityInfo(activity.javaClass.name)
                 if (guestInfo != null) {
