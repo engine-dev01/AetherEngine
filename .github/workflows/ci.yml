@@ -5,6 +5,12 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      note:
+        description: 'หมายเหตุรอบทดสอบ (optional)'
+        required: false
+        default: 'manual trigger'
 
 jobs:
   lint:
