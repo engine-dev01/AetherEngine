@@ -40,14 +40,14 @@ class _DetectScreenState extends State<DetectScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(strings.detectTitle, style: Theme.of(context).textTheme.headlineSmall),
+        Text(S.detectTitle, style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
-        Text(strings.detectSubtitle, style: Theme.of(context).textTheme.bodySmall),
+        Text(S.detectSubtitle, style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 16),
         TextField(
           controller: _pathCtrl,
           decoration: InputDecoration(
-            labelText: strings.detectPathLabel,
+            labelText: S.detectPathLabel,
             hintText: '/storage/emulated/0/Download/SNAKE.apk',
             border: const OutlineInputBorder(),
             suffixIcon: IconButton(
@@ -95,7 +95,7 @@ class _DetectScreenState extends State<DetectScreen> {
     final hits = (_report?['hits'] as List?) ?? [];
     if (hits.isEmpty) return const SizedBox.shrink();
     return Card(child: Column(children: [
-      ListTile(title: Text(strings.detectHitsTitle)),
+      ListTile(title: Text(S.detectHitsTitle)),
       ...hits.map((h) {
         final m = (h as Map).cast<String, dynamic>();
         return ListTile(dense: true,
