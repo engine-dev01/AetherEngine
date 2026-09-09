@@ -101,4 +101,15 @@ class S {
       default:    return enOffline;
     }
   }
+
+  // ─── Detect Screen (P4) ───
+  static const enDetectTitle = 'Detect';
+  static const enDetectSubtitle = 'Scan a sample (APK/ZIP) with the bundled evidence packs — fully offline.';
+  static const enDetectPathLabel = 'Path to sample';
+  static const enDetectHitsTitle = 'Matched rules (evidence-backed)';
+
+  static String get detectTitle => enDetectTitle;
+  static String get detectSubtitle => enDetectSubtitle;
+  static String get detectPathLabel => enDetectPathLabel;
+  static String get detectHitsTitle => enDetectHitsTitle;
 }

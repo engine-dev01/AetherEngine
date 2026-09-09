@@ -74,10 +74,5 @@ object EngineLoader {
             .edit { putString(KEY_TYPE, type.name) }
         Log.i(TAG, "Engine type set to ${type.displayName} (restart app to apply)")
     }
-
-    fun getEngineType(context: Context): EngineType {
-        val name = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_TYPE, EngineType.AETHER.name) ?: EngineType.AETHER.name
-        return runCatching { EngineType.valueOf(name) }.getOrDefault(EngineType.AETHER)
-    }
+    // getEngineType — removed 2026-09-09 (WIRING_AUDIT §C orphan — no callers)
 }

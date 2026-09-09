@@ -50,20 +50,6 @@ size_t loadDir(const std::string& dir) {
     return n;
 }
 
-std::vector<uint8_t> decrypt(const std::string& sha256hex, const std::vector<uint8_t>& jklKey) {
-    if (jklKey.size() != 30) return {};                       // jkl_key ไม่ valid
-    if (!aether::KeyStore::isValid(jklKey)) return {};        // version byte != 0x01
-    auto cipher = get(sha256hex);
-    if (cipher.empty()) return {};
-    // derive per-name key: XOR jkl with sha256hex chars (cyclic)
-    auto perNameKey = aether::KeyStore::deriveKey(jklKey, sha256hex);
-    if (perNameKey.size() != 30) return {};
-    // XOR cipher with per-name key (cycle through)
-    std::vector<uint8_t> plain(cipher.size());
-    for (size_t i = 0; i < cipher.size(); ++i) {
-        plain[i] = cipher[i] ^ perNameKey[i % perNameKey.size()];
-    }
-    return plain;
-}
+// decrypt() — removed 2026-09-09: only caller was nativeDecryptPayloadByHash (cut — WIRING_AUDIT §B)
 
 } // namespace aether::PayloadStore

@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "id": "snake-8bp",
+  "version": "56.23.2+behavioral",
+  "family": "SNAKE Engine",
+  "description": "ตระกูล SNAKE cheat engine (com.snake) สำหรับ 8 Ball Pool — static (APK) + behavioral (data dump) rules จากหลักฐาน 4 ชั้น",
+  "threshold": 40.0,
+  "references": [
+    "shared/analysis/miniclip-56.23.2/  (Layer 1: 22 notes — เกมแท้ baseline)",
+    "shared/analysis/snake-live-2026-05-23/  (Layer 2: 19 notes — live behavior)",
+    "shared/analysis/libengine-jni-decompile/  (Layer 3: Ghidra + 44 init_array)",
+    "shared/analysis/snake-dex-decompile-2026-09-09/  (Layer 4: jadx + Blutter + synthesis 9 ส่วน)"
+  ],
+  "rules": [
+    { "id": "pkg-com-snake", "type": "filename", "value": "**", "entry_contains": "com.snake", "note": "package name — AndroidManifest (Layer 4)", "weight": 5 },
+
+    { "id": "c2-rest-snakeseller", "type": "string", "value": "rest.snakeseller.com", "entry_glob": "**", "note": "C2 API — Layer 4 synthesis §3", "weight": 10 },
+    { "id": "c2-snakeengine-topup", "type": "string", "value": "snakeengine.com/topup", "entry_glob": "**", "note": "topup endpoint — Layer 4 synthesis §3", "weight": 10 },
+    { "id": "c2-ip-9220510345", "type": "string", "value": "92.205.103.45", "entry_glob": "**", "note": "C2 IP เดียวกันทั้ง 2 domain — Layer 4", "weight": 8 },
+
+    { "id": "daemon-channel-snake-engine", "type": "string", "value": "Snake Engine", "entry_glob": "**", "note": "notification channel — DaemonService (Layer 4)", "weight": 6 },
+    { "id": "virtualapp-aidl-g00", "type": "string", "value": "androidx.appcompat.view.menu", "entry_glob": "**/*.dex", "note": "โค้ดจริงซ่อนใน AndroidX namespace 2,804 ไฟล์ (R8) — Layer 4", "weight": 8 },
+    { "id": "virtualapp-enum-server-child-main", "type": "string", "value": "ChildAppClient", "entry_glob": "**", "note": "enum Server/ChildAppClient/Main — multi-process VirtualApp — Layer 4", "weight": 6 },
+
+    { "id": "libengine-so", "type": "filename", "value": "**/libengine.so", "note": "native engine — Layer 3", "weight": 6 },
+    { "id": "libengine-process-vm-readv", "type": "string", "value": "process_vm_readv", "entry_glob": "**/libengine.so", "note": "อ่าน memory เกม — Layer 3 imports", "weight": 10 },
+    { "id": "libengine-jni-onload", "type": "string", "value": "JNI_OnLoad", "entry_glob": "**/libengine.so", "note": "dynamic RegisterNatives (dlsym) — Layer 3", "weight": 3 },
+
+    { "id": "libapp-c2-action", "type": "string", "value": "action=upload_profile_image", "entry_glob": "**/libapp.so", "note": "Dart C2 flow — Layer 4 Blutter", "weight": 8 },
+    { "id": "libapp-multi-game-carrom", "type": "string", "value": "Carrom", "entry_glob": "**/libapp.so", "note": "multi-game 3 เกม — Layer 4 + 44185.mp4", "weight": 4 },
+    { "id": "libapp-entry-key", "type": "string", "value": "Entry Key", "entry_glob": "**/libapp.so", "note": "license activation 6 ช่อง — 44185.mp4", "weight": 4 },
+
+    { "id": "behavioral-package-conf", "type": "filename", "value": "**/package.conf", "note": "VirtualApp guest registry — Layer 1+2 พบใน data dump เสมอ", "weight": 6 },
+    { "id": "behavioral-entry-key-data", "type": "string", "value": "Entry Key", "entry_glob": "**", "note": "license activation string ใน telemetry/logs — 44185.mp4", "weight": 4 },
+    { "id": "behavioral-guest-8bp-in-conf", "type": "string", "value": "com.miniclip.eightballpool", "entry_glob": "**/package.conf", "note": "package.conf เก็บชื่อเกม guest ที่ถูก host — Layer 2", "weight": 5 },
+
+    { "id": "sandbox-root-dir", "type": "filename", "value": "**/root/data/user/0/**", "note": "VirtualApp sandbox layout: root/data/{app,user,user_de}/0/<guest-pkg> — ไม่มีใน app ปกติ — Layer 2 dump", "weight": 8 },
+    { "id": "sandbox-proc-cmdline", "type": "filename", "value": "**/root/proc/0/cmdline", "note": "fake /proc ของ sandbox — Layer 2 dump (root/proc/0/cmdline พร้อม spoof)", "weight": 6 },
+    { "id": "sandbox-shared-user-conf", "type": "filename", "value": "**/root/system/uid.conf", "note": "sandbox uid mapping files — Layer 2 dump", "weight": 4 },
+    { "id": "sandbox-guest-lib-dir", "type": "filename", "value": "**/root/data/app/**", "entry_contains": "/lib/", "note": "guest .so ถูก mount ใน sandbox — Layer 2 dump", "weight": 4 },
+
+    { "id": "sandbox-guest-data-mounted", "type": "filename", "value": "**/root/data/user/0/**", "entry_contains": "miniclip", "note": "ไฟล์ data ของเกม guest ทั้งไฟล์เกม (libpglarmor.so/libgame...3965.so) ปรากฏใน root/data/user/0/<เกมอื่น>/ — เป็นไปไม่ได้ใน app ปกติ — com.snake_1.zip dump", "weight": 8 },
+    { "id": "sandbox-guest-webview-suffix", "type": "filename", "value": "**/app_webview_0:**", "note": "WebView suffix สอง process (app_webview_0:pkg:pkg) — artifact ของ multi-process sandbox เท่านั้น — com.snake_1.zip dump", "weight": 5 },
+    { "id": "behavioral-guest-pgl-armor-in-sandbox", "type": "filename", "value": "**/root/**", "entry_contains": "pglarmor", "note": "libpglarmor.so ของ 8BP ถูก mount ใน sandbox ของ app อื่น — Layer 2: PGL armor .so IDENTICAL หลังรัน (decrypt ใน RAM)", "weight": 6 }
+  ]
+}

@@ -60,3 +60,6 @@ temp/
 # Build signing
 *.p12
 *.bat
+
+# detect fixtures — generated จาก make_fixtures.py ไม่ commit
+detect/tests/fixtures/
