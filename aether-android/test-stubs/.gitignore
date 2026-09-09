@@ -1,0 +1,4 @@
+# Build artifacts from build.sh (regenerated on every run)
+stubs.jar
+kotlin-out/
+java-out/
