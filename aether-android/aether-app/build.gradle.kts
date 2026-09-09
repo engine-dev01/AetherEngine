@@ -36,3 +36,26 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
 }
+
+// =====================================================================
+// localTest — fast local unit test that uses AOSP-signature stubs
+// (skips Android SDK + Robolectric, runs in < 5s vs 6min assembleDebug)
+//
+// Stub jar location: /tmp/aether-stubs/stubs.jar
+// Stub sources:     /tmp/aether-stubs/{android,com}/
+// Stub rebuild:     sh /tmp/aether-stubs/build.sh
+//
+// CI workflow can replace `./gradlew :aether-app:testDebugUnitTest`
+// with `./gradlew :aether-app:localTest` for pure-Kotlin unit tests.
+// =====================================================================
+tasks.register<Exec>("localTest") {
+    description = "Run pure-Kotlin unit tests with AOSP-signature stubs (no Android SDK)"
+    group = "verification"
+
+    // Run the script that wires stubs + main + test + JUnit
+    commandLine = listOf("sh", "/tmp/run-aether-test.sh")
+
+    // Fail the build if any test fails (script exits non-zero)
+    isIgnoreExitValue = false
+}
+
