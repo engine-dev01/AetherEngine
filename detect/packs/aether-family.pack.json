@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "aether-family",
+  "version": "0.1",
+  "family": "AetherEngine",
+  "description": "ตระกูล Aether — rebuild ของ Snake Engine ตาม source จริง (engine-dev01/AetherEngine @718f5c9). ทุก rule อ้าง source file/line ตรง ๆ — pack นี้คือ self-detection: ตรวจรอยของตัวเองใน build output",
+  "threshold": 30.0,
+  "references": [
+    "https://github.com/engine-dev01/AetherEngine @ 718f5c9",
+    "aether-native/src/main/cpp/core/*.cpp (18 ไฟล์)",
+    "DESIGN_PLAN.md §3 (สินทรัพย์ที่ยกไป vs ตัด)"
+  ],
+  "rules": [
+    { "id": "pkg-com-aether", "type": "filename", "value": "**", "entry_contains": "com.aether", "note": "package — AetherHostActivity.kt / AetherApp.kt", "weight": 5 },
+
+    { "id": "native-mem-reader", "type": "string", "value": "process_vm_readv", "entry_glob": "**/libaether.so", "note": "mem_reader.cpp — aether-native core", "weight": 10 },
+    { "id": "native-jni-hook", "type": "string", "value": "GetMethodID", "entry_glob": "**/libaether.so", "note": "jni_hook.cpp 4 slots — GetMethodID + 3×CallObjectMethod", "weight": 6 },
+    { "id": "native-aob-scanner", "type": "string", "value": "aob_scan", "entry_glob": "**/libaether.so", "note": "aob_scanner.cpp — 4MB windows + TTL cache", "weight": 6 },
+    { "id": "native-lz4", "type": "string", "value": "LZ4_decompress_safe", "entry_glob": "**/libaether.so", "note": "third_party/lz4 — payload codec", "weight": 4 },
+    { "id": "native-stealth-ptrace", "type": "string", "value": "PR_SET_DUMPABLE", "entry_glob": "**/libaether.so", "note": "stealth.cpp — ptrace TRACEME", "weight": 4 },
+
+    { "id": "kotlin-orchestrator", "type": "string", "value": "AetherOrchestrator", "entry_glob": "**/*.dex", "note": "Kotlin layer — engine lifecycle", "weight": 5 },
+    { "id": "kotlin-vpn-service", "type": "string", "value": "AetherVpnService", "entry_glob": "**/*.dex", "note": "vpn/AetherVpnService.kt", "weight": 3 },
+    { "id": "kotlin-daemon-pidof", "type": "string", "value": "pidof", "entry_glob": "**/*.dex", "note": "AetherDaemonService FGS loop", "weight": 4 },
+
+    { "id": "flutter-games-registry", "type": "string", "value": "games.dart", "entry_glob": "**/libapp.so", "note": "Flutter shell — games registry", "weight": 3 },
+    { "id": "flutter-fa-icons", "type": "filename", "value": "**/fa-solid-900.woff", "note": "assets/fonts — FontAwesome (menu rail 65 icons)", "weight": 3 },
+    { "id": "flutter-social-svgs", "type": "filename", "value": "**/assets/social/*.svg", "note": "discord/telegram/whatsapp SVG — sales surface", "weight": 3 }
+  ]
+}
