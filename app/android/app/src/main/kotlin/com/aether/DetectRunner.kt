@@ -126,7 +126,8 @@ object DetectRunner {
         ZipFile(sample).use { z -> z.getEntry(rel)?.let { z.getInputStream(it).readBytes() } }
     } catch (e: Exception) { null }
 
-    /** glob เดียวกับ aether_scan.py: **/ = นำหน้า 0+ dirs, ** = ข้าม / ได้, * = ไม่ข้าม /
+    /** glob เดียวกับ aether_scan.py — ดาวคู่ตาม dir-slash หมายนำหน้า 0+ โฟลเดอร์,
+     *  ดาวคู่ลอย ๆ ข้าม slash ได้, ดาวเดี่ยวไม่ข้าม slash
      *  แปลง pattern → regex ด้วย escaping ทีละส่วน (ไม่ escape แล้ว replace — ลำดับผิด) */
     private fun fnmatchLike(name: String, pattern: String): Boolean {
         val sb = StringBuilder()
