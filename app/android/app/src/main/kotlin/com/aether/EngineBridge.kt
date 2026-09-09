@@ -188,7 +188,7 @@ object EngineBridge : MethodCallHandler {
         }
         out["packs"] = packs
         out["hits"] = report.hits.map { h ->
-            mapOf("pack" to h.packId, "rule" to h.ruleId, "entry" to h.entry, "type" to h.hitType)
+            mapOf("pack" to h.packId, "rule" to h.ruleId, "entry" to h.entry, "type" to h.evidence)
         }
         Log.i(TAG, "scanSample($path) → ${report.hits.size} hits")
         return out
