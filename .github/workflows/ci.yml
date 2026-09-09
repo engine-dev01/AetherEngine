@@ -135,6 +135,16 @@ jobs:
           python-version: '3.11'
       - name: "Verify packs (schema + scoring integrity)"
         run: python3 detect/packs_verify.py detect/packs
+      - name: "Assets↔packs sync check (APK bundles the same packs CI tests)"
+        run: |
+          echo "=== assets/detect_packs must be byte-identical to detect/packs ==="
+          mkdir -p app/android/app/src/main/assets/detect_packs
+          cp detect/packs/*.pack.json app/android/app/src/main/assets/detect_packs/
+          git diff --exit-code -- app/android/app/src/main/assets/detect_packs/ || {
+            echo "::error::assets/detect_packs differs from detect/packs — regenerate + commit (cp detect/packs/*.pack.json app/android/app/src/main/assets/detect_packs/)"
+            exit 1
+          }
+          echo "✓ bundled packs = tested packs"
       - name: "Functional scan test (fixture: DETECTED / CLEAN / SUSPICIOUS)"
         run: python3 detect/tests/scan_test.py
       - name: "Report determinism check (สแกน 2 ครั้ง → hash ต้องเหมือนกัน)"

@@ -13,6 +13,7 @@ import '../i18n/strings.dart';
 import '../widgets/banner_carousel.dart';
 import '../widgets/paywall_button.dart';
 import '../data/games.dart';
+import 'detect_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -351,14 +352,18 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             _buildAppBar(locale),
-            BannerCarousel(onReadMore: _readMore),
-            _buildEnginePanel(),
-            const SizedBox(height: 8),
-            _buildCapabilityButtons(),
-            const SizedBox(height: 8),
-            _buildLaunchAppRow(),
-            const Spacer(),
-            PaywallButton(onTap: _getSubscription),
+            if (_bottomIndex == 0)
+              Expanded(child: DetectScreen())
+            else ...[
+              BannerCarousel(onReadMore: _readMore),
+              _buildEnginePanel(),
+              const SizedBox(height: 8),
+              _buildCapabilityButtons(),
+              const SizedBox(height: 8),
+              _buildLaunchAppRow(),
+              const Spacer(),
+              PaywallButton(onTap: _getSubscription),
+            ],
             const SizedBox(height: 8),
             _buildBottomNav(),
           ],
@@ -617,10 +622,11 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _navItem(Icons.add_circle_outline, 0),
-          _navItem(Icons.shopping_cart_outlined, 1),
-          _navItem(Icons.chat_bubble_outline, 2),
-          _navItem(Icons.settings_outlined, 3),
+          _navItem(Icons.radar, 0),
+          _navItem(Icons.add_circle_outline, 1),
+          _navItem(Icons.shopping_cart_outlined, 2),
+          _navItem(Icons.chat_bubble_outline, 3),
+          _navItem(Icons.settings_outlined, 4),
         ],
       ),
     );
@@ -631,9 +637,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final color = active ? const Color(0xFF00C853) : Colors.white38;
     return InkWell(
       onTap: () {
-        if (index == 0) return;
         setState(() => _bottomIndex = index);
-        _snack('${S.navAdd} / ${S.navCart} / ${S.navChat} / ${S.navSettings}: not ported (offline)');
+        if (index != 0) {
+          _snack('${S.navAdd} / ${S.navCart} / ${S.navChat} / ${S.navSettings}: not ported (offline)');
+        }
       },
       child: Padding(
         padding: const EdgeInsets.all(12),

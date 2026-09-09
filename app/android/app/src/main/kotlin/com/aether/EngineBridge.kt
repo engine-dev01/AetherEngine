@@ -8,6 +8,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import org.json.JSONObject
 
 /**
  * com.aether.engine_bridge — Flutter ↔ Aether shell bridge (Phase 3)
@@ -70,6 +71,7 @@ object EngineBridge : MethodCallHandler {
                 "getEngineStats" -> result.success(getEngineStats())
                 "getVirtualAppStatus" -> result.success(getVirtualAppStatus())
                 "testVirtualFS" -> result.success(testVirtualFS())
+                "scanSample" -> result.success(scanSample(call.arguments as? String))
                 "readMemory" -> result.success(readMemory(
                     call.argument<Number>("address")?.toLong() ?: 0L,
                     call.argument<Number>("size")?.toInt() ?: 0
@@ -166,6 +168,32 @@ object EngineBridge : MethodCallHandler {
      * Phase 3.5.C: exercise VirtualFS path resolution. Returns a
      * human-readable status string ("OK: ..." or "NO REDIRECT: ...").
      */
+    /**
+     * scanSample — P4: สแกนไฟล์ sample ด้วย packs ที่ bundle ใน assets/detect_packs
+     * ทำงานบนเครื่องผู้ใช้ 100% offline — โดยเรียก DetectRunner (pack-driven matcher
+     * port จาก detect/aether_scan.py หลักสูตรเดียวกับ CI detect-lab)
+     * คืน Map: packs→verdict/score + hits[] อ้าง rule id + entry ที่ยิง
+     */
+    private fun scanSample(path: String?): Map<String, Any> {
+        if (path.isNullOrBlank()) throw IllegalArgumentException("path required")
+        val packsDir = DetectRunner.extractBundledPacks(ctx!!)
+        val report = DetectRunner.scan(path, packsDir)
+        val out = HashMap<String, Any>()
+        val packs = HashMap<String, Any>()
+        for ((id, r) in report.packResults) {
+            val m = HashMap<String, Any>()
+            m["verdict"] = r.verdict
+            m["score"] = r.score
+            packs[id] = m
+        }
+        out["packs"] = packs
+        out["hits"] = report.hits.map { h ->
+            mapOf("pack" to h.packId, "rule" to h.ruleId, "entry" to h.entry, "type" to h.hitType)
+        }
+        Log.i(TAG, "scanSample($path) → ${report.hits.size} hits")
+        return out
+    }
+
     private fun testVirtualFS(): String {
         return com.aether.engine.proxy.VirtualAppContainer.testVirtualFSResolve()
     }
