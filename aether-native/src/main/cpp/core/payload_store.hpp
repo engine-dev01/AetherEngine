@@ -19,6 +19,6 @@ size_t loadDir(const std::string& dirPath);
 
 // ถอด payload โดยใช้ jkl_key (DATA_DUMP.md §4.3) + KeyStore::deriveKey (per-name XOR)
 // return empty vector ถ้าไม่เจอ payload หรือ key ไม่ valid (size != 30)
-std::vector<uint8_t> decrypt(const std::string& sha256hex, const std::vector<uint8_t>& jklKey);
+// decrypt() — removed 2026-09-09 (WIRING_AUDIT §B cascade)
 
 } // namespace aether::PayloadStore

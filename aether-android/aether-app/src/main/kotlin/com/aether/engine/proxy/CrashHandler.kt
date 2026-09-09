@@ -80,11 +80,8 @@ object CrashHandler {
         return true
     }
 
-    fun uninstall() {
-        if (!isInstalled.get()) return
-        originalHandler?.let { Thread.setDefaultUncaughtExceptionHandler(it) }
-        isInstalled.set(false)
-    }
+    // uninstall()/getLatestCrashLog()/clearCrashLogs()/getCrashDir() — removed 2026-09-09:
+    // no callers (WIRING_AUDIT §C orphans). getCrashLogs() kept (used by handleException).
 
     // ══════════════════════════════════════════
     //  Exception Handling
@@ -460,11 +457,5 @@ object CrashHandler {
         crashDir?.listFiles { f -> f.name.startsWith("crash_") && f.name.endsWith(".log") }
             ?.sortedByDescending { it.lastModified() } ?: emptyList()
 
-    fun getLatestCrashLog(): String? = getCrashLogs().firstOrNull()?.readText()
-
-    fun clearCrashLogs() {
-        crashDir?.listFiles()?.filter { it.name.startsWith("crash_") }?.forEach { it.delete() }
-    }
-
-    fun getCrashDir(): File? = crashDir
+    // getLatestCrashLog/clearCrashLogs/getCrashDir — removed 2026-09-09 (WIRING_AUDIT §C orphans)
 }

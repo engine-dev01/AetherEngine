@@ -65,9 +65,8 @@ object EngineBridge : MethodCallHandler {
     override fun onMethodCall(call: MethodCall, result: Result) {
         try {
             when (call.method) {
-                "launchGame" -> result.success(launchGame(call.argument<String>("packageName")))
+                // launchGame/getEngineStatus — removed 2026-09-09 (WIRING_AUDIT §D: no Dart call-sites)
                 "isTargetInstalled" -> result.success(isTargetInstalled(call.argument<String>("packageName")))
-                "getEngineStatus" -> result.success(getEngineStatus())
                 "getEngineStats" -> result.success(getEngineStats())
                 "getVirtualAppStatus" -> result.success(getVirtualAppStatus())
                 "testVirtualFS" -> result.success(testVirtualFS())
@@ -104,12 +103,7 @@ object EngineBridge : MethodCallHandler {
     //  Engine methods — all block body
     // ══════════════════════════════════════════
 
-    private fun launchGame(@Suppress("UNUSED_PARAMETER") pkg: String?): Boolean {
-        val o = com.aether.engine.proxy.AetherOrchestrator
-        val healthy = o.isInitialized() && o.isAttachedToProcess() && o.isEngineRunning()
-        Log.i(TAG, "launchGame(pkg=$pkg) → healthy=$healthy")
-        return healthy
-    }
+    // launchGame()/getEngineStatus() — removed 2026-09-09 (WIRING_AUDIT §D: no Dart call-sites)
 
     /**
      * isTargetInstalled — checks whether [packageName] is installed on this device.
@@ -131,16 +125,6 @@ object EngineBridge : MethodCallHandler {
             Log.w(TAG, "isTargetInstalled($packageName) error: ${e.message}")
             false
         }
-    }
-
-    private fun getEngineStatus(): Map<String, Any> {
-        val o = com.aether.engine.proxy.AetherOrchestrator
-        val out = HashMap<String, Any>()
-        out["initialized"] = o.isInitialized()
-        out["attached"] = o.isAttachedToProcess()
-        out["running"] = o.isEngineRunning()
-        out["selfAttach"] = true
-        return out
     }
 
     private fun getEngineStats(): Map<String, Any> {

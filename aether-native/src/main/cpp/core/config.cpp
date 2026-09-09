@@ -22,26 +22,7 @@ void Config::applyOffsets(const std::vector<std::string>& keys,
     for (size_t i = 0; i < n; ++i) s_offsets[keys[i]] = values[i];
 }
 
-uint64_t Config::entropy() {
-    // Combine clock + seed + address entropy
-    uint64_t v = 0;
-#if defined(__aarch64__)
-    asm volatile("mrs %0, cntvct_el0" : "=r"(v));
-#else
-    v = (uint64_t)clock() ^ (uint64_t)time(nullptr);
-#endif
-    v ^= (uint64_t)&entropy; // code address
-    v ^= s_seed;
-    return v;
-}
-
-std::string Config::deriveKey(int seed) {
-    std::mt19937 rng(seed ^ s_seed);
-    std::string k;
-    k.resize(16);
-    for (int i = 0; i < 16; ++i) k[i] = (char)(rng() & 0xFF);
-    return k;
-}
+// entropy()/deriveKey() — removed: no callers after WIRING_AUDIT §B cut
 
 void Config::setSeed(int seed) {
     s_seed = (uint32_t)seed;

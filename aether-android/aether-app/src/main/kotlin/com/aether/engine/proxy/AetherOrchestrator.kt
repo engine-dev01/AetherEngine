@@ -525,15 +525,7 @@ object AetherOrchestrator {
         VirtualAppContainer.shutdown()
         // ArtHookEngine.unhookAll() — removed (no-op)
         SandboxManager.init(appContext!!) // re-init to clear state
-
-        // Binder override cleanup
-        try {
-            com.aether.Engine.restoreBinderCallingPidOverride(0)
-            com.aether.Engine.restoreBinderCallingUidOverride(0)
-            Log.d(TAG, "Binder PID/UID overrides restored")
-        } catch (e: Throwable) {
-            Log.w(TAG, "Binder cleanup: ${e.message}")
-        }
+        // Binder override cleanup — removed: set* never called (WIRING_AUDIT §B restore-without-set)
 
         // 4. Reset counters
         readCount = 0

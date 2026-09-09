@@ -1,26 +1,10 @@
-// binder.cpp — Binder PID/UID override (transient)
+// binder.cpp — Binder PID/UID override state (transient)
+// overridePid/overrideUid/restorePid/restoreUid — removed 2026-09-09:
+// JNI surface cut (no Kotlin callers, restore-without-set bug — WIRING_AUDIT §B).
+// Kept as placeholder: if override state tracking is needed again, restore
+// from git history at commit 718f5c9.
 #include "binder.hpp"
 
 namespace aether {
-
-// Note: Real binder override uses internal libbinder APIs.
-// Here we expose a controlled shim; actual override done in Kotlin layer
-// via hidden reflection (setBinderCallingPidOverride). Native just tracks state.
-
-static int g_pid = -1;
-static int g_uid = -1;
-
-int Binder::overridePid(int newPid) {
-    int old = g_pid; g_pid = newPid; return old;
-}
-int Binder::overrideUid(int newUid) {
-    int old = g_uid; g_uid = newUid; return old;
-}
-int Binder::restorePid(int oldPid) {
-    int prev = g_pid; g_pid = oldPid; return prev;
-}
-int Binder::restoreUid(int oldUid) {
-    int prev = g_uid; g_uid = oldUid; return prev;
-}
-
+// (intentionally empty — state removed with the dead API)
 } // namespace aether

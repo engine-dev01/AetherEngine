@@ -21,21 +21,8 @@ object Flagger {
     }
 
     // ─── Flag Definitions ───
-
-    /** เปิดใช้งาน VPN tunnel */
-    fun vpnEnabled(): Boolean = get("vpn_enabled", true)
-
-    /** เปิดใช้งาน auto-attach ghost engine */
-    fun autoAttachEnabled(): Boolean = get("auto_attach", true)
-
-    /** เปิดใช้งาน sandbox redirect */
-    fun sandboxEnabled(): Boolean = get("sandbox_enabled", false)
-
-    /** เปิดใช้งาน AOB memory scanning */
-    fun aobScanEnabled(): Boolean = get("aob_scan", true)
-
-    /** เปิด debug logging */
-    fun debugLogging(): Boolean = get("debug_logging", false)
+    // vpnEnabled/autoAttachEnabled/sandboxEnabled/aobScanEnabled/debugLogging —
+    // removed 2026-09-09 (WIRING_AUDIT §C orphans — no callers)
 
     // ─── Core ───
 
@@ -47,23 +34,12 @@ object Flagger {
         return prefs?.getBoolean(KEY_PREFIX + key, default) ?: default
     }
 
-    fun setString(key: String, value: String) {
-        prefs?.edit()?.putString(KEY_PREFIX + key, value)?.apply()
-    }
-
     fun getString(key: String, default: String): String {
         return prefs?.getString(KEY_PREFIX + key, default) ?: default
-    }
-
-    fun setLong(key: String, value: Long) {
-        prefs?.edit()?.putLong(KEY_PREFIX + key, value)?.apply()
     }
 
     fun getLong(key: String, default: Long): Long {
         return prefs?.getLong(KEY_PREFIX + key, default) ?: default
     }
 
-    fun resetAll() {
-        prefs?.edit()?.clear()?.apply()
-    }
 }

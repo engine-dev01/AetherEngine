@@ -16,10 +16,6 @@ public:
     static void applyOffsets(const std::vector<std::string>& keys,
                              const std::vector<int64_t>& values);
 
-    // Entropy source for key derivation.
-    static uint64_t entropy();
-    // Derive key from seed (deterministic).
-    static std::string deriveKey(int seed);
     // Set RNG seed.
     static void setSeed(int seed);
 

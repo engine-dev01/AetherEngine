@@ -71,24 +71,10 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
         {"nativeDecryptPayload","([B[B)[B",(void*)Java_com_aether_Engine_nativeDecryptPayload},
         {"nativeWatchdogCheck","()Z",(void*)Java_com_aether_Engine_nativeWatchdogCheck},
         {"nativeCompute","(I)[B",(void*)Java_com_aether_Engine_nativeCompute},
-        {"nativeValidate","([B)Z",(void*)Java_com_aether_Engine_nativeValidate},
-        {"nativeExchangeKeys","(Ljava/lang/String;Ljava/lang/String;)V",(void*)Java_com_aether_Engine_nativeExchangeKeys},
         {"nativeWriteLog","(Ljava/lang/String;)V",(void*)Java_com_aether_Engine_nativeWriteLog},
-        {"nativeDeriveKey","(I)Ljava/lang/String;",(void*)Java_com_aether_Engine_nativeDeriveKey},
-        {"nativeProcessPair","(Ljava/lang/Object;Ljava/lang/Object;)V",(void*)Java_com_aether_Engine_nativeProcessPair},
-        {"nativeProcessTriple","(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)V",(void*)Java_com_aether_Engine_nativeProcessTriple},
-        {"nativeReflectUpdate","(Ljava/lang/Object;Ljava/lang/reflect/Method;)V",(void*)Java_com_aether_Engine_nativeReflectUpdate},
-        {"nativeInitContext","(Landroid/content/Context;)V",(void*)Java_com_aether_Engine_nativeInitContext},
-        {"nativeEntropy","()J",(void*)Java_com_aether_Engine_nativeEntropy},
         {"nativeSetSeed","(I)V",(void*)Java_com_aether_Engine_nativeSetSeed},
         {"nativeOffset","()J",(void*)Java_com_aether_Engine_nativeOffset},
         {"nativeOffset2","()J",(void*)Java_com_aether_Engine_nativeOffset2},
-        {"setAccessible","(Ljava/lang/reflect/Field;)V",(void*)Java_com_aether_Engine_setAccessible__Ljava_lang_reflect_Field_2},
-        {"setAccessible","(Ljava/lang/reflect/Method;)V",(void*)Java_com_aether_Engine_setAccessible__Ljava_lang_reflect_Method_2},
-        {"setBinderCallingPidOverride","(I)I",(void*)Java_com_aether_Engine_setBinderCallingPidOverride},
-        {"setBinderCallingUidOverride","(I)I",(void*)Java_com_aether_Engine_setBinderCallingUidOverride},
-        {"restoreBinderCallingPidOverride","(I)V",(void*)Java_com_aether_Engine_restoreBinderCallingPidOverride},
-        {"restoreBinderCallingUidOverride","(I)V",(void*)Java_com_aether_Engine_restoreBinderCallingUidOverride},
         {"decryptString","(J[Ljava/lang/String;)Ljava/lang/String;",(void*)Java_com_aether_Engine_decryptString},
         {"enableIO","()V",(void*)Java_com_aether_Engine_enableIO},
         {"addIORule","(Ljava/lang/String;Ljava/lang/String;)V",(void*)Java_com_aether_Engine_addIORule},
@@ -96,7 +82,6 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
         {"installNetworkHttpProbe","()V",(void*)Java_com_aether_Engine_installNetworkHttpProbe},
         {"loadEmptyDex","()[J",(void*)Java_com_aether_Engine_loadEmptyDex},
         {"nativeHydratePayloads","(Ljava/lang/String;Ljava/lang/String;)I",(void*)Java_com_aether_Engine_nativeHydratePayloads},
-        {"nativeDecryptPayloadByHash","(Ljava/lang/String;[B)[B",(void*)Java_com_aether_Engine_nativeDecryptPayloadByHash},
         {"addClassRule","(Ljava/lang/String;Ljava/lang/String;)V",(void*)Java_com_aether_Engine_addClassRule},
         {"clearClassRules","()V",(void*)Java_com_aether_Engine_clearClassRules},
         {"classRuleCount","()I",(void*)Java_com_aether_Engine_classRuleCount},
@@ -169,30 +154,13 @@ JNIEXPORT jbyteArray JNICALL Java_com_aether_Engine_nativeCompute(JNIEnv* e, jcl
     jbyteArray r = e->NewByteArray(8);
     e->SetByteArrayRegion(r, 0, 8, reinterpret_cast<const jbyte*>(out.data())); return r;
 }
-JNIEXPORT jboolean JNICALL Java_com_aether_Engine_nativeValidate(JNIEnv* e, jclass, jbyteArray data) {
-    return data ? JNI_TRUE : JNI_FALSE;
-}
-JNIEXPORT void JNICALL Java_com_aether_Engine_nativeExchangeKeys(JNIEnv*, jclass, jstring, jstring) { LOGD("exchangeKeys"); }
 JNIEXPORT void JNICALL Java_com_aether_Engine_nativeWriteLog(JNIEnv* e, jclass, jstring msg) { LOGD("log: %s", jstr(e, msg).c_str()); }
-JNIEXPORT jstring JNICALL Java_com_aether_Engine_nativeDeriveKey(JNIEnv* e, jclass, jint seed) {
-    std::string k = aether::Config::deriveKey(seed); return e->NewStringUTF(k.c_str());
-}
-JNIEXPORT void JNICALL Java_com_aether_Engine_nativeProcessPair(JNIEnv*, jclass, jobject, jobject) { LOGD("processPair"); }
-JNIEXPORT void JNICALL Java_com_aether_Engine_nativeProcessTriple(JNIEnv*, jclass, jobject, jobject, jobject) { LOGD("processTriple"); }
-JNIEXPORT void JNICALL Java_com_aether_Engine_nativeReflectUpdate(JNIEnv*, jclass, jobject, jobject) { LOGD("reflectUpdate"); }
-JNIEXPORT void JNICALL Java_com_aether_Engine_nativeInitContext(JNIEnv*, jclass, jobject) { LOGD("initContext"); }
-JNIEXPORT jlong JNICALL Java_com_aether_Engine_nativeEntropy(JNIEnv*, jclass) { return (jlong)aether::Config::entropy(); }
 JNIEXPORT void JNICALL Java_com_aether_Engine_nativeSetSeed(JNIEnv*, jclass, jint seed) { aether::Config::setSeed(seed); }
 
 // ─── Hook + Binder ───
 JNIEXPORT jlong JNICALL Java_com_aether_Engine_nativeOffset(JNIEnv*, jclass) { return aether::Config::getOffset("offset"); }
 JNIEXPORT jlong JNICALL Java_com_aether_Engine_nativeOffset2(JNIEnv*, jclass) { return aether::Config::getOffset("offset2"); }
-JNIEXPORT void JNICALL Java_com_aether_Engine_setAccessible__Ljava_lang_reflect_Field_2(JNIEnv*, jclass, jobject) { LOGD("setAccessible(Field)"); }
-JNIEXPORT void JNICALL Java_com_aether_Engine_setAccessible__Ljava_lang_reflect_Method_2(JNIEnv*, jclass, jobject) { LOGD("setAccessible(Method)"); }
-JNIEXPORT jint JNICALL Java_com_aether_Engine_setBinderCallingPidOverride(JNIEnv*, jclass, jint pid) { return aether::Binder::overridePid(pid); }
-JNIEXPORT jint JNICALL Java_com_aether_Engine_setBinderCallingUidOverride(JNIEnv*, jclass, jint uid) { return aether::Binder::overrideUid(uid); }
-JNIEXPORT void JNICALL Java_com_aether_Engine_restoreBinderCallingPidOverride(JNIEnv*, jclass, jint old) { aether::Binder::restorePid(old); }
-JNIEXPORT void JNICALL Java_com_aether_Engine_restoreBinderCallingUidOverride(JNIEnv*, jclass, jint old) { aether::Binder::restoreUid(old); }
+// setAccessible/set/restoreBinderCalling* — removed: no callers (WIRING_AUDIT §B)
 
 // ─── String Encryption ───
 // เรียก StrDecrypt::decrypt ตาม AetherMind/NATIVE_LOGIC.md §C (key 0x30261adb60b7b4f4 + counter + LCG rotate)
@@ -255,16 +223,4 @@ JNIEXPORT jint JNICALL Java_com_aether_Engine_nativeHydratePayloads(JNIEnv* e, j
     return (jint)n;
 }
 
-// nativeDecryptPayloadByHash(sha256hex, jklKeyBytes) → plaintext bytes
-// return null array ถ้าไม่เจอหรือ jkl invalid
-JNIEXPORT jbyteArray JNICALL Java_com_aether_Engine_nativeDecryptPayloadByHash(JNIEnv* e, jclass, jstring sha, jbyteArray jklKey) {
-    std::string hash = jstr(e, sha);
-    jsize kn = e->GetArrayLength(jklKey);
-    std::vector<uint8_t> key(kn);
-    e->GetByteArrayRegion(jklKey, 0, kn, reinterpret_cast<jbyte*>(key.data()));
-    std::vector<uint8_t> plain = aether::PayloadStore::decrypt(hash, key);
-    if (plain.empty()) return nullptr;
-    jbyteArray out = e->NewByteArray((jsize)plain.size());
-    e->SetByteArrayRegion(out, 0, (jsize)plain.size(), reinterpret_cast<const jbyte*>(plain.data()));
-    return out;
-}
+// nativeDecryptPayloadByHash — removed: no callers (WIRING_AUDIT §B)
