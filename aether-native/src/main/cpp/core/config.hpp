@@ -16,6 +16,8 @@ public:
     static void applyOffsets(const std::vector<std::string>& keys,
                              const std::vector<int64_t>& values);
 
+    // Entropy source (used by nativeCompute) — restored 2026-09-09.
+    static uint64_t entropy();
     // Set RNG seed.
     static void setSeed(int seed);
 

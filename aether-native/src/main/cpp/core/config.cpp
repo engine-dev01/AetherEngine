@@ -22,7 +22,22 @@ void Config::applyOffsets(const std::vector<std::string>& keys,
     for (size_t i = 0; i < n; ++i) s_offsets[keys[i]] = values[i];
 }
 
-// entropy()/deriveKey() — removed: no callers after WIRING_AUDIT §B cut
+// entropy() — restored 2026-09-09: transitive dependency of nativeCompute
+// (JNI USED). First cut was wrong — wiring audit only checked the JNI surface,
+// not the C++-internal call graph. Lesson recorded in pre_flight_check.sh §2.
+uint64_t Config::entropy() {
+    // Combine clock + seed + address entropy
+    uint64_t v = 0;
+#if defined(__aarch64__)
+    asm volatile("mrs %0, cntvct_el0" : "=r"(v));
+#else
+    v = (uint64_t)clock() ^ (uint64_t)time(nullptr);
+#endif
+    v ^= (uint64_t)&entropy; // code address
+    v ^= s_seed;
+    return v;
+}
+// deriveKey() stays cut — no callers anywhere (Config::deriveKey ≠ KeyStore::deriveKey)
 
 void Config::setSeed(int seed) {
     s_seed = (uint32_t)seed;
