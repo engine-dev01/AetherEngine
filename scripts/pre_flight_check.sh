@@ -12,10 +12,20 @@ KT_ENGINE="aether-core/src/main/kotlin/com/aether/Engine.kt"
 FAIL=0
 
 echo "═══ Pre-flight: C++-internal call graph ═══"
-# สัญลักษณ์ C++ ที่เคยตัด/จะตัด ต้องไม่ถูกเรียกจากไฟล์ .cpp อื่น (นอกไฟล์ผู้ให้บริการ)
-for sym in "Config::entropy" "Config::deriveKey" "Binder::overridePid" "Binder::overrideUid" "Binder::restorePid" "Binder::restoreUid" "PayloadStore::decrypt"; do
-  base="${sym%%::*}"   # เช่น PayloadStore::decrypt → PayloadStore
-  refs=$(grep -rn "$sym" $CPP_DIR --include="*.cpp" --include="*.hpp" 2>/dev/null | grep -v "config.cpp\|config.hpp\|binder.cpp\|binder.hpp\|payload_store" || true)
+# สัญลักษณ์ C++ ที่ยังถูกตัดอยู่ในปัจจุบัน (อัปเดต 2026-09-09 หลัง restore entropy):
+# ต้องไม่ถูกเรียกจาก C++ ตัวอื่น และต้องไม่มี declaration ค้างใน header
+# (entropy ถูก restore แล้ว — มี caller จริงคือ nativeCompute จึงไม่อยู่ในลิสต์นี้)
+CUT_SYMS=(
+  "Config::deriveKey"
+  "Binder::overridePid" "Binder::overrideUid"
+  "Binder::restorePid" "Binder::restoreUid"
+  "PayloadStore::decrypt"
+)
+for sym in "${CUT_SYMS[@]}"; do
+  # มีใครยังเรียก? (นอกไฟล์ผู้ให้บริการ + นอก comment)
+  refs=$(grep -rn "$sym" $CPP_DIR --include="*.cpp" --include="*.hpp" 2>/dev/null \
+    | grep -v "config.cpp\|config.hpp\|binder.cpp\|binder.hpp\|payload_store" \
+    | grep -v "^\s*//\|#\s" || true)
   if [ -n "$refs" ]; then
     echo "✗ DANGLING: $sym ยังถูกเรียกโดย:"
     echo "$refs" | head -5
