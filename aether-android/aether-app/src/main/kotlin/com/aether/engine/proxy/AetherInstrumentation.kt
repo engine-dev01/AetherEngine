@@ -183,6 +183,43 @@ class AetherInstrumentation(
         try {
             if (guestApp != null && activity.javaClass.name != stubComponent &&
                 activity.packageName != guestApp.packageName) {
+                // 0) FORCE-GUEST Resources (round-8, SNAKE-proven zg0.k/a5):
+                //    Before ANY cache-null/recreate cycle, replace the host-table
+                //    Resources (MiuiResourcesImpl) with one built on the guest's
+                //    own arsc (addAssetPath guest apk FIRST). All subsequent
+                //    lazy re-inits (delegate, theme, inflater) then resolve in
+                //    the guest id space.
+                buildGuestResources(guestApp.packageName!!)?.let { gres ->
+                    findFieldUp(activity.javaClass, "mResources")?.let { fl ->
+                        fl.isAccessible = true
+                        fl.set(activity, gres)
+                    }
+                    // guest app context: its mResources field drives
+                    // getApplicationContext().getResources() too
+                    findFieldUp(guestApp.javaClass, "mResources")?.let { fl ->
+                        fl.isAccessible = true
+                        fl.set(guestApp, gres)
+                    }
+                    // The base ContextImpl behind the guest app context caches
+                    // its Resources in mResourcesInner — same table swap
+                    runCatching {
+                        val appCtx = guestApp
+                        if (appCtx != null) {
+                            val mBaseF = findFieldUp(appCtx.javaClass, "mBase")
+                            if (mBaseF != null) {
+                                mBaseF.isAccessible = true
+                                val baseCtx = mBaseF.get(appCtx)
+                                if (baseCtx != null) {
+                                    findFieldUp(baseCtx.javaClass, "mResources")?.let { fl ->
+                                        fl.isAccessible = true
+                                        fl.set(baseCtx, gres)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    DiagLog.d(TAG, "callActivityOnCreate: Resources → guest arsc table (${gres.javaClass.simpleName})")
+                }
                 // 1) mBase → guest app context (package, resources, classloader)
                 val mBase = findFieldUp(activity.javaClass, "mBase")
                 if (mBase != null) {
@@ -213,14 +250,16 @@ class AetherInstrumentation(
                     fl.isAccessible = true
                     fl.set(activity, null)
                 }
-                findFieldUp(activity.javaClass, "mResources")?.let { fl ->
-                    fl.isAccessible = true
-                    fl.set(activity, null)
-                }
+                // NOTE (round-8): mResources is NO LONGER nulled here — step 0
+                // above SET it to the guest-arsc Resources. Nulling would make
+                // the lazy re-fetch fall back to the host-table Resources again
+                // (the round-5..7 crash). mDelegate nulling stays: the delegate
+                // recreates with the now-guest context.
                 DiagLog.d(TAG, "callActivityOnCreate: AppCompat mDelegate nulled (will lazily recreate with guest ctx)")
-                // Null the ContextThemeWrapper caches as well (round-5 fix — still
-                // needed for the Activity's own theme/inflater resolution).
-                for (fieldName in listOf("mTheme", "mResources", "mInflater")) {
+                // Null the ContextThemeWrapper caches as well (round-5 fix —
+                // mTheme/mInflater must re-resolve; mResources was replaced by
+                // the guest table in step 0, NOT nulled).
+                for (fieldName in listOf("mTheme", "mInflater")) {
                     findFieldUp(activity.javaClass, fieldName)?.let { fl ->
                         fl.isAccessible = true
                         fl.set(activity, null)
@@ -255,7 +294,48 @@ class AetherInstrumentation(
         base.callActivityOnCreate(activity, icicle)
     }
 
-    /** Resolve the guest's real ActivityInfo from the guest PackageManager. */
+    /**
+ * Re-root the guest's Resources at the GUEST's own arsc table.
+ *
+ * PROVEN root cause of rounds 5-7 (see 2026-09-11 RCA): the guest context
+ * from createPackageContext hands back a Resources whose asset table wraps
+ * the HOST's arsc (on MIUI: MiuiResourcesImpl). Every guest resId (0x7f...)
+ * then resolves against the host table → 'Resources$NotFoundException:
+ * com.aether:id/design_menu_item_action_area_stub' at super.onCreate.
+ *
+ * SNAKE-proven fix (zg0.k + a5.java, verified in decompile 2026-09-09):
+ *   AssetManager am = AssetManager.class.newInstance()   // FRESH instance
+ *   am.addAssetPath(guestApkSourceDir)                    // guest arsc FIRST
+ *   Resources res = new Resources(am, hostMetrics, hostConfig)
+ * → guest ids resolve in the guest's own table.
+ */
+private fun buildGuestResources(guestPkg: String): android.content.res.Resources? {
+    return try {
+        val pm = guestApp?.packageManager ?: return null
+        val appInfo = pm.getApplicationInfo(guestPkg, 0)
+        val apkPath = appInfo.sourceDir ?: return null
+        // Fresh AssetManager via reflection — SNAKE a5: newInstance()
+        val am = Class.forName("android.content.res.AssetManager")
+            .getDeclaredConstructor().newInstance() as android.content.res.AssetManager
+        val mAdd = am.javaClass.getMethod("addAssetPath", String::class.java)
+        mAdd.isAccessible = true
+        mAdd.invoke(am, apkPath)
+        // host metrics/config are safe to reuse (they describe the SCREEN,
+        // not the resource table)
+        val hostRes = guestApp!!.resources ?: return null
+        val ctor = android.content.res.Resources::class.java.getConstructor(
+            android.content.res.AssetManager::class.java,
+            android.util.DisplayMetrics::class.java,
+            android.content.res.Configuration::class.java
+        )
+        val res = ctor.newInstance(am, hostRes.displayMetrics, hostRes.configuration)
+        DiagLog.d(TAG, "buildGuestResources: guest arsc loaded from $apkPath")
+        res
+    } catch (e: Throwable) {
+        DiagLog.d(TAG, "buildGuestResources failed: ${e.message}")
+        null
+    }
+}
     private fun resolveGuestActivityInfo(activityClass: String): ActivityInfo? {
         return try {
             val pm = guestApp?.packageManager ?: return null
