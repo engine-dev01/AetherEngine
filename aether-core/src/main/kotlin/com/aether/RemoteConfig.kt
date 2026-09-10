@@ -138,7 +138,7 @@ object RemoteConfig {
             // compatibility (RemoteConfig schema) but the engine does
             // not dispatch Intent to this package.
             gamePackage = "com.aether",
-            gameVersion = "56.23.2",
+            gameVersion = "56.29.1",
             aobSignatures = listOf(
                 AobSignature(
                     name = "ball_position",

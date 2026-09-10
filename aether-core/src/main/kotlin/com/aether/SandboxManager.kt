@@ -45,12 +45,43 @@ object SandboxManager {
     private const val DEFAULT_PGL_VERSION = "90d8aa15a2de2cb4"
     private const val PGL_DIR_HASH = "a0rjgdfbjd8fhfglkew6"
 
+    // PGL hash dirs from real game dumps (56.23.2 → 90d8aa..., 56.29.1 → 9e75dd...)
+    // Hash เปลี่ยนตามเวอร์ชันเกมที่ติดตั้ง — ใช้ resolvePglVersions() อ่านสดจากเครื่อง
+    // (รายการนี้เป็นแค่ fallback เมื่อไม่มีสิทธิ์ list dir จริง)
+    private val KNOWN_PGL_VERSIONS = listOf(
+        "9e75dd17d258d07f",  // 8BP 56.29.1 (code 4013) — dump เกมจริง 2026-09-11
+        "90d8aa15a2de2cb4",  // 8BP 56.23.2 (code 3965) — blueprint เดิม
+    )
+
  /** 706d494674354b747939547a3839354b4e43626776773d3d = base64-ish hash dir (จาก data dump) */
     private val ENC_DIR_BASE = "706d494674354b747939547a3839354b4e43626776773d3d"
     private const val ENC_TOKEN_FILE = "ed9d0e2eaae14a4bba0f853a071cd8d2"
 
  /** j9g29zqf0cfqd3vvu2bw — profile cache dir (จาก data dump) */
     private const val CACHE_DIR_HASH = "j9g29zqf0cfqd3vvu2bw"
+
+    /**
+     * Resolve PGL version dir(s) ตามเกมเวอร์ชันที่ผู้ใช้ติดตั้งจริง.
+     * อ่านสดจาก /data/user/0/<pkg>/a0rjgdfbjd8fhfglkew6/*/ — ถ้า list ได้
+     * ใช้ของจริง (support ทุกเวอร์ชัน 56.23.2 → 56.29.1+); ถ้าไม่มีสิทธิ์
+     * fallback ไป KNOWN_PGL_VERSIONS (ใหม่สุดก่อน). คืนค่า list เพื่อให้
+     * caller sync ทุกเวอร์ชันที่มี (เผื่อเกมอ่านหลายชั้น).
+     */
+    fun resolvePglVersions(targetPkg: String = this.targetPkg): List<String> {
+        val base = File("/data/user/0/$targetPkg/$PGL_DIR_HASH")
+        val found = try {
+            base.listFiles()?.filter { it.isDirectory }?.map { it.name }?.sortedDescending()
+                ?: emptyList()
+        } catch (_: Throwable) { emptyList() }
+        if (found.isNotEmpty()) return found
+        // fallback: ใช้ known list (ใหม่สุดก่อน == 9e75dd... สำหรับ 56.29.1)
+        return KNOWN_PGL_VERSIONS
+    }
+
+    /** ปกติใช้รุ่นแรกของ resolvePglVersions() (รุ่นที่ติดตั้งจริง/ใหม่สุด) */
+    private fun resolvePglVersion(targetPkg: String): String {
+        return resolvePglVersions(targetPkg).firstOrNull() ?: DEFAULT_PGL_VERSION
+    }
 
     fun init(context: Context) {
         appContext = context.applicationContext
@@ -94,7 +125,10 @@ object SandboxManager {
             File(pkgDir, d).mkdirs()
         }
         // PGL modules path (ตาม blueprint: a0rjgdfbjd8fhfglkew6/<pgl>/arm64-v8a)
-        File(pkgDir, "$PGL_DIR_HASH/$DEFAULT_PGL_VERSION/arm64-v8a").mkdirs()
+        // ใช้ resolvePglVersions() — รองรับทุกเวอร์ชันเกมที่ผู้ใช้ติดตั้ง (56.23.2 → 56.29.1+)
+        resolvePglVersions(targetPkg).forEach { v ->
+            File(pkgDir, "$PGL_DIR_HASH/$v/arm64-v8a").mkdirs()
+        }
  // Encrypted token dir + cache dir (จาก data dump)
         val encDir = File(pkgDir, ENC_DIR_BASE)
         encDir.mkdirs()
@@ -232,13 +266,30 @@ object SandboxManager {
             // 2. PGL stubs — สร้าง runtime (ไม่ฝังใน APK — ตามต้นแบบ APK ไม่มี assets/pgl)
             // ต้นแบบ: pgl อยู่ที่ runtime sandbox root/.../a0rjgdfb/.../arm64-v8a/ (DATA_DUMP §5)
             // เกมโหลด .so ผ่าน dlopen หลัง bootstrap — ถ้าไม่มี จะไปดึงจาก PayloadStore/files/ ภายหลัง
-            val pglDir = File(root, "data/user/0/$targetPkg/$PGL_DIR_HASH/$DEFAULT_PGL_VERSION/arm64-v8a")
+            val pglDir = File(root, "data/user/0/$targetPkg/$PGL_DIR_HASH/${resolvePglVersion(targetPkg)}/arm64-v8a")
             pglDir.mkdirs()
-            listOf("libbuffer_pgl.so", "libpglarmor.so").forEach { stubName ->
+            // 56.29.1 (code 4013): libadsurge* 4 ไฟล์ + pglarmor/buffer — copy .so จริงจากเครื่องก่อน, stub ELF เป็น fallback
+            val realPglDir = File("/data/user/0/$targetPkg/$PGL_DIR_HASH/${resolvePglVersion(targetPkg)}/arm64-v8a")
+            val pglStubNames = listOf(
+                "libbuffer_pgl.so",
+                "libpglarmor.so",
+                "libfile_lock_pgl.so",
+                "libadsurgeav1d.so",
+                "libadsurgeav1d_jni.so",
+                "libadsurgeflex.so",
+                "libadsurgeqjs.so"
+            )
+            pglStubNames.forEach { stubName ->
                 val dest = File(pglDir, stubName)
                 if (!dest.exists()) {
-                    // สร้าง ELF stub เปล่า runtime (120B minimal ELF) — placeholder จน payload มาถึง
-                    try { dest.writeBytes(createElfStub(stubName)) } catch (_: Exception) {}
+                    val real = File(realPglDir, stubName)
+                    val copied = real.exists() && try {
+                        real.copyTo(dest, overwrite = true); true
+                    } catch (_: Exception) { false }
+                    if (!copied) {
+                        // สร้าง ELF stub เปล่า runtime (120B minimal ELF) — placeholder จน payload มาถึง
+                        try { dest.writeBytes(createElfStub(stubName)) } catch (_: Exception) {}
+                    }
                 }
             }
 
@@ -360,25 +411,42 @@ object SandboxManager {
         val stubDir = "${sandboxRoot?.absolutePath}/pgl"
         File(stubDir).mkdirs()
 
+        // 56.29.1 (code 4013): PGL 3 ตัว + libadsurge* 4 ไฟล์; ใช้ .so จริงจากเครื่องก่อน, ELF stub เป็น fallback
         val stubFiles = listOf(
             "libbuffer_pgl.so",
-            "libpglarmor.so"
+            "libpglarmor.so",
+            "libfile_lock_pgl.so",
+            "libadsurgeav1d.so",
+            "libadsurgeav1d_jni.so",
+            "libadsurgeflex.so",
+            "libadsurgeqjs.so"
         )
+        val realPglDir = File("/data/user/0/$targetPkg/$PGL_DIR_HASH/$pglVersion/arm64-v8a")
         for (stubName in stubFiles) {
             val stubFile = File(stubDir, stubName)
             if (!stubFile.exists()) {
-                try { stubFile.writeBytes(createElfStub(stubName)) } catch (_: Exception) {}
+                val real = File(realPglDir, stubName)
+                val copied = real.exists() && try {
+                    real.copyTo(stubFile, overwrite = true); true
+                } catch (_: Exception) { false }
+                if (!copied) {
+                    try { stubFile.writeBytes(createElfStub(stubName)) } catch (_: Exception) {}
+                }
             }
             execShell("mkdir -p $pglPath && mount --bind ${stubFile.absolutePath} $pglPath/$stubName")
         }
 
         // libgame-BPM: copy จาก data เกมจริง ผ่าน syncGameData (ไม่ฝัง binary)
-        val gameBpm = File(pglPath, "libgame-BPM-GooglePlay-Gold-Release-Module-3965.so")
-        if (!gameBpm.exists()) {
-            val srcBpm = File("/data/user/0/$targetPkg/$PGL_DIR_HASH/$pglVersion/arm64-v8a/libgame-BPM-GooglePlay-Gold-Release-Module-3965.so")
-            if (srcBpm.exists()) {
+        // ⚠️ ชื่อไฟล์เปลี่ยนตามเวอร์ชัน: 56.23.2=Module-3965, 56.29.1=Module-4013 —
+        //    อย่า hardcode — scan หา libgame-BPM-*.so จากเครื่องจริง
+        val srcBpmDir = File("/data/user/0/$targetPkg/$PGL_DIR_HASH/$pglVersion/arm64-v8a")
+        val srcBpm = srcBpmDir.listFiles()?.firstOrNull { it.name.startsWith("libgame-BPM-") }
+        if (srcBpm != null) {
+            val gameBpm = File(pglPath, srcBpm.name)
+            if (!gameBpm.exists()) {
                 try { srcBpm.copyTo(gameBpm, overwrite = true) } catch (_: Exception) {}
             }
         }
     }
 }
+

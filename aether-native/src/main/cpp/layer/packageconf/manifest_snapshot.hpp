@@ -6,8 +6,8 @@
 namespace aether::l1 {
 struct ManifestSnapshot {
     std::string packageName = "com.miniclip.eightballpool";
-    std::string versionName = "56.23.2";
-    int versionCode = 56232;
+    std::string versionName = "56.29.1";
+    int versionCode = 4013;
     std::vector<std::string> activities;
     std::vector<std::string> services;
     std::vector<std::string> providers;
