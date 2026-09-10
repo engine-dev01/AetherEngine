@@ -146,8 +146,9 @@ jobs:
           "$TC/kotlinc/bin/kotlinc" -version
 
       - name: Run localTest (AOSP-stub unit tests)
-        env:
-          KOTLINC_HOME: ~/.cache/aether-test/kotlinc
-          JUNIT_HOME: ~/.cache/aether-test/junit-libs
+        # NOTE: อย่าใช้ ~/ ใน env block — GitHub Actions ไม่ expand tilde,
+        # ทำให้ build.sh ได้ literal "~/.cache/..." แล้วหา kotlinc ไม่เจอ (run 34428990860)
         run: |
+          export KOTLINC_HOME="$HOME/.cache/aether-test/kotlinc"
+          export JUNIT_HOME="$HOME/.cache/aether-test/junit-libs"
           ./gradlew --no-daemon --console=plain :aether-android:localTest
