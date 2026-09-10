@@ -25,6 +25,46 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
+      # ─── Unit-test gate (AOSP-stub, ~5s หลัง cache hit) ───
+      # รันก่อน Flutter setup + SDK setup + compile 3 นาที → ถ้า logic เสียจะพังที่นี่
+      # เอา ~10s แทนเปลือง setup ทั้งหมด ~5 min
+      # cache key เดียวกับ ci.yml job local-test (actions/cache share ข้าม workflow)
+      # NOTE: export $HOME ใน run script เท่านั้น — env: block ไม่ expand ~ (บทเรียน run 34428990860)
+      - name: Cache Kotlin compiler + JUnit libs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/aether-test/kotlinc
+            ~/.cache/aether-test/junit-libs
+          key: aether-test-${{ runner.os }}-k1.9.24-j4.13.2
+
+      - name: Install toolchain (kotlinc 1.9.24 + JUnit 4.13.2)
+        run: |
+          set -e
+          TC="$HOME/.cache/aether-test"
+          mkdir -p "$TC/kotlinc" "$TC/junit-libs"
+          if [ ! -x "$TC/kotlinc/bin/kotlinc" ]; then
+            curl -sL -o /tmp/kotlin-compiler.zip \
+              'https://github.com/JetBrains/kotlin/releases/download/v1.9.24/kotlin-compiler-1.9.24.zip'
+            unzip -q /tmp/kotlin-compiler.zip -d "$TC"
+          fi
+          if [ ! -f "$TC/junit-libs/junit.jar" ]; then
+            curl -sL -o "$TC/junit-libs/junit.jar" \
+              'https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar'
+            curl -sL -o "$TC/junit-libs/hamcrest.jar" \
+              'https://repo1.maven.org/maven2/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar'
+          fi
+          "$TC/kotlinc/bin/kotlinc" -version
+
+      - name: Unit-test gate (AOSP-stub, before heavy setup)
+        run: |
+          set -e
+          export KOTLINC_HOME="$HOME/.cache/aether-test/kotlinc"
+          export JUNIT_HOME="$HOME/.cache/aether-test/junit-libs"
+          echo "=== [gate 0] AOSP-stub unit tests (~5s, no SDK/gradle) ==="
+          sh aether-android/test-stubs/run-aether-test.sh
+          echo "✅ Unit tests passed — continuing to release build setup"
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
