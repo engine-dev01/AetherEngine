@@ -32,7 +32,8 @@ mkdir -p kotlin-out java-out
 javac -d java-out \
     android/content/pm/PackageInfo.java \
     android/content/pm/ActivityInfo.java \
-    android/content/pm/PackageManager.java
+    android/content/pm/PackageManager.java \
+    android/content/pm/ApplicationInfo.java
 echo "STEP1 OK (javac)"
 
 # Step 2: Kotlin stubs, with Java classes on classpath
@@ -40,6 +41,10 @@ echo "STEP1 OK (javac)"
     android/content/Intent.kt \
     android/content/Context.kt \
     android/content/ComponentName.kt \
+    android/content/res/AssetManager.kt \
+    android/content/res/Resources.kt \
+    android/content/res/Configuration.kt \
+    android/util/DisplayMetrics.kt \
     android/app/Activity.kt \
     android/app/ActivityThread.kt \
     android/app/Application.kt \
