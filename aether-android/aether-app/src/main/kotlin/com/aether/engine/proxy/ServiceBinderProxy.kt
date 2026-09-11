@@ -123,8 +123,6 @@ object ServiceBinderProxy {
             createProxyForService(SERVICE_NOTIFICATION, svcManager, "notification")
             createProxyForService(SERVICE_SHORTCUT, svcManager, "shortcut")
             createProxyForService(SERVICE_USAGE_STATS, svcManager, "usagestats")
-            createProxyForService(SERVICE_SHORTCUT, svcManager, "shortcut")
-            createProxyForService(SERVICE_USAGE_STATS, svcManager, "usagestats")
 
             Log.i(TAG, "Initialized ${proxyCache.size} service proxies")
         } catch (e: Exception) {
