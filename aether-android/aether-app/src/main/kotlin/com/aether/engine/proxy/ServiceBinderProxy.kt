@@ -71,6 +71,8 @@ object ServiceBinderProxy {
     const val SERVICE_NETWORK_STATS = "network_stats_manager"
     const val SERVICE_DISPLAY       = "display_manager"
     const val SERVICE_CLIPBOARD_PRIMARY = "primary_clipboard_manager"
+    const val SERVICE_SHORTCUT      = "shortcut_service"
+    const val SERVICE_USAGE_STATS   = "usage_stats_manager"
 
     private val ALL_SERVICES = listOf(
         SERVICE_ACTIVITY, SERVICE_PACKAGE, SERVICE_JOB, SERVICE_STORAGE,
@@ -82,7 +84,8 @@ object ServiceBinderProxy {
         SERVICE_DROPBOX, SERVICE_VOICE, SERVICE_INPUT_METHOD, SERVICE_TEXT_SERVICES,
         SERVICE_PRINT, SERVICE_SEARCH, SERVICE_APPWIDGET, SERVICE_WALLPAPER,
         SERVICE_ACCESSIBILITY, SERVICE_RESTRICTIONS, SERVICE_BATTERY,
-        SERVICE_NETWORK_STATS, SERVICE_DISPLAY, SERVICE_CLIPBOARD_PRIMARY
+        SERVICE_NETWORK_STATS, SERVICE_DISPLAY, SERVICE_CLIPBOARD_PRIMARY,
+        SERVICE_SHORTCUT, SERVICE_USAGE_STATS
     )
 
     // ─── Cache ───
@@ -118,6 +121,8 @@ object ServiceBinderProxy {
             createProxyForService(SERVICE_ACCOUNT, svcManager, "account")
             createProxyForService(SERVICE_LOCATION, svcManager, "location")
             createProxyForService(SERVICE_NOTIFICATION, svcManager, "notification")
+            createProxyForService(SERVICE_SHORTCUT, svcManager, "shortcut")
+            createProxyForService(SERVICE_USAGE_STATS, svcManager, "usagestats")
             createProxyForService(SERVICE_SHORTCUT, svcManager, "shortcut")
             createProxyForService(SERVICE_USAGE_STATS, svcManager, "usagestats")
 
@@ -230,6 +235,16 @@ object ServiceBinderProxy {
                 return handleActivityCall(method, args)
             }
 
+            // ── Shortcut service interception (8BP: Play Games shortcuts) ──
+            if (serviceName == SERVICE_SHORTCUT) {
+                return handleShortcutCall(method, args)
+            }
+
+            // ── Usage stats (contains measurement dynamite) ──
+            if (serviceName == SERVICE_USAGE_STATS) {
+                return handleUsageStatsCall(method, args)
+            }
+
             // ── Default: delegate to real binder ──
             return try {
                 val asBinderMethod = realBinder.javaClass.getMethod("asBinder")
@@ -286,6 +301,65 @@ object ServiceBinderProxy {
         private fun handleActivityCall(method: Method, args: Array<out Any>?): Any? {
             // Override package ใน ActivityManager calls
             return handlePackageCall(method, args)
+        }
+
+        private fun handleShortcutCall(method: Method, args: Array<out Any>?): Any? {
+            return try {
+                val methodName = method.name
+                // ป้องกัน "Calling package name mismatch" จาก Play Games shortcuts
+                if (methodName == "getShortcuts" || methodName.contains("shortcut")) {
+                    Log.d(TAG, "Blocked shortcut call: $methodName for ${overridePackage ?: originalPackage}")
+                    return emptyList<Any>() // Return ค่าว่างแทนที่จะ throw
+                }
+                
+                // Override package name ถ้ามี
+                val modifiedArgs = args?.map { arg ->
+                    if (arg is String && arg == originalPackage && overridePackage.isNotEmpty()) {
+                        overridePackage
+                    } else {
+                        arg
+                    }
+                }?.toTypedArray()
+
+                val asBinderMethod = realBinder.javaClass.getMethod("asBinder")
+                val binder = asBinderMethod.invoke(realBinder) as? IBinder
+                    ?: return method.invoke(realBinder, *(modifiedArgs ?: emptyArray()))
+
+                handleBinderTransact(binder, method, modifiedArgs)
+            } catch (e: Exception) {
+                Log.w(TAG, "Shortcut proxy call failed: ${e.message}")
+                emptyList<Any>() // ปลอดภัย: คืนค่าว่างเสมอ
+            }
+        }
+
+        private fun handleUsageStatsCall(method: Method, args: Array<out Any>?): Any? {
+            return try {
+                val methodName = method.name
+                // ป้องกัน measurement dynamite crashes
+                if (methodName.contains("usage") || methodName.contains("stats") || 
+                    methodName.contains("configurationInfo") || methodName.contains("appPredictor")) {
+                    Log.d(TAG, "Blocked usage/stats call: $methodName for ${overridePackage ?: originalPackage}")
+                    return null // Return null แทนที่จะ throw
+                }
+                
+                // Override package name ถ้ามี
+                val modifiedArgs = args?.map { arg ->
+                    if (arg is String && arg == originalPackage && overridePackage.isNotEmpty()) {
+                        overridePackage
+                    } else {
+                        arg
+                    }
+                }?.toTypedArray()
+
+                val asBinderMethod = realBinder.javaClass.getMethod("asBinder")
+                val binder = asBinderMethod.invoke(realBinder) as? IBinder
+                    ?: return method.invoke(realBinder, *(modifiedArgs ?: emptyArray()))
+
+                handleBinderTransact(binder, method, modifiedArgs)
+            } catch (e: Exception) {
+                Log.w(TAG, "Usage stats proxy call failed: ${e.message}")
+                null // ปลอดภัย: คืนค่า null เสมอ
+            }
         }
 
         private fun handleBinderTransact(binder: IBinder, method: Method, args: Array<out Any>?): Any? {
@@ -380,23 +454,6 @@ object ServiceBinderProxy {
                 "account"     -> "android.accounts.IAccountManager"
                 "location"    -> "android.location.ILocationManager"
                 "notification" -> "android.app.INotificationManager"
-                else -> return null
-            }
-            Class.forName(className)
-        } catch (e: ClassNotFoundException) {
-            Log.w(TAG, "IInterface class not found for $serviceName")
-            null
-        }
-    }
-}
-e(className)
-        } catch (e: ClassNotFoundException) {
-            Log.w(TAG, "IInterface class not found for $serviceName")
-            null
-        }
-    }
-}
-nager"
                 else -> return null
             }
             Class.forName(className)
