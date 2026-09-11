@@ -62,7 +62,7 @@ object SandboxManager {
 
     /**
      * Resolve PGL version dir(s) ตามเกมเวอร์ชันที่ผู้ใช้ติดตั้งจริง.
-     * อ่านสดจาก /data/user/0/<pkg>/a0rjgdfbjd8fhfglkew6/*/ — ถ้า list ได้
+     * อ่านสดจาก /data/user/0/<pkg>/a0rjgdfbjd8fhfglkew6/{hash}/ — ถ้า list ได้
      * ใช้ของจริง (support ทุกเวอร์ชัน 56.23.2 → 56.29.1+); ถ้าไม่มีสิทธิ์
      * fallback ไป KNOWN_PGL_VERSIONS (ใหม่สุดก่อน). คืนค่า list เพื่อให้
      * caller sync ทุกเวอร์ชันที่มี (เผื่อเกมอ่านหลายชั้น).
