@@ -165,12 +165,10 @@ object SandboxManager {
                "app_textures", "app_webview_0:$targetPkg:$targetPkg").forEach { d ->
             File(pkgDir, d).mkdirs()
         }
-        // PGL modules path (ตาม blueprint: a0rjgdfbjd8fhfglkew6/<pgl>/arm64-v8a)
-        // ใช้ resolvePglVersions() — รองรับทุกเวอร์ชันเกมที่ผู้ใช้ติดตั้ง (56.23.2 → 56.29.1+)
-        resolvePglVersions(targetPkg).forEach { v ->
-            File(pkgDir, "$PGL_DIR_HASH/$v/arm64-v8a").mkdirs()
-        }
- // Encrypted token dir + cache dir (จาก data dump)
+        // PGL modules path — เกมสร้างเองตอนรัน (หลักฐาน: ขนาดไฟล์ PGL ต่างข้ามเครื่อง
+        //   = เกม generate ตามเวอร์ชัน/ตำแหน่งของมันเอง เหมือนแอปปกติ)
+        //   engine อย่า pre-create — ไม่งั้น dir ผิดเวอร์ชัน (ของเก่า) ปนเข้ามา
+        // Encrypted token dir + cache dir (จาก data dump)
         val encDir = File(pkgDir, ENC_DIR_BASE)
         encDir.mkdirs()
         File(pkgDir, CACHE_DIR_HASH).mkdirs()
@@ -304,56 +302,17 @@ object SandboxManager {
             //    จริงถูก provision มาแล้ว (จาก dump) ก็เก็บไว้; ไม่มีก็ไม่เขียน stub.
             // (generatePackageConf ถูก deprecate — เขียน stub = ผิดหลักการ)
 
-            // 2. PGL modules — per-version (ตรงต้นแบบ: 56.23.2=3 ไฟล์, 56.29.1=7 ไฟล์)
-            // ต้นแบบ: pgl อยู่ที่ runtime sandbox root/.../a0rjgdfb/.../arm64-v8a/ (DATA_DUMP §5)
-            // เกมโหลด .so ผ่าน dlopen หลัง bootstrap — ถ้าไม่มี จะไปดึงจาก PayloadStore/files/ ภายหลัง
-            val pglVersion = resolvePglVersion(targetPkg)
-            val pglDir = File(root, "data/user/0/$targetPkg/$PGL_DIR_HASH/$pglVersion/arm64-v8a")
-            pglDir.mkdirs()
-            val realPglDir = File("/data/user/0/$targetPkg/$PGL_DIR_HASH/$pglVersion/arm64-v8a")
-            // รายชื่อไฟล์ตามเวอร์ชัน + libgame-BPM-* (ตัวเกม) — scan จากเครื่องจริงก่อน
-            val pglNames = mutableListOf<String>()
-            PGL_FILES_BY_VERSION[pglVersion]?.let { pglNames.addAll(it) }
-            val realLibs = try {
-                realPglDir.listFiles()?.map { it.name } ?: emptyList()
-            } catch (_: Throwable) { emptyList() }
-            if (realLibs.isNotEmpty()) {
-                // ใช้ชื่อไฟล์จริงจากเครื่อง (รองรับทุกเวอร์ชัน)
-                pglNames.clear()
-                pglNames.addAll(realLibs.filter { it.endsWith(".so") })
-            } else {
-                // fallback: ชื่อ libgame ตามเวอร์ชัน (หลักฐานจาก dump)
-                pglNames.add(pglGameModuleName(pglVersion))
-            }
-            pglNames.distinct().forEach { stubName ->
-                val dest = File(pglDir, stubName)
-                if (!dest.exists()) {
-                    val real = File(realPglDir, stubName)
-                    val copied = real.exists() && try {
-                        real.copyTo(dest, overwrite = true); true
-                    } catch (_: Exception) { false }
-                    if (!copied) {
-                        Log.w(TAG, "PGL $stubName ไม่มีไฟล์จริง — ปล่อยให้เกมเขียนเอง (ไม่สร้าง stub ปลอม)")
-                    }
-                }
-            }
+            // 2. PGL modules — เกมเขียนเองตอนรัน (หลักฐาน: ขนาดไฟล์ต่างข้ามเครื่อง
+            //    = เกม generate ตามเวอร์ชัน/ตำแหน่งของมัน เหมือนแอปปกติ)
+            //    engine ไม่ต้อง pre-create dir หรือ copy .so ใด ๆ — redirect
+            //    path ทำให้เกมเขียนลง sandbox เอง (SNAKE dump พิสูจน์: ไฟล์เกม
+            //    ใน sandbox ต้นแบบ = เกมสร้างตอน runtime)
 
             // 3. fake /proc + /system
             File(root, "proc/0/cmdline").writeText(targetPkg)
             File(root, "system/uid.conf").writeText("# AetherEngine virtual UID conf\n")
             File(root, "system/user.conf").writeText("# AetherEngine virtual user conf\n")
             File(root, "system/shared-user.conf").writeText("# AetherEngine virtual shared-user conf\n")
-
-            // 4. shared_prefs placeholder (จะถูกแทนด้วย data จริงจาก syncGameData เมื่อมีสิทธิ์)
-            val prefsDir = File(root, "data/user/0/$targetPkg/shared_prefs")
-            val prefsFile = File(prefsDir, "${targetPkg}.xml")
-            if (!prefsFile.exists()) {
-                prefsFile.writeText(
-                    """<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
-<map>
-</map>"""
-                )
-            }
 
             android.util.Log.i(TAG, "Sandbox bootstrapped at ${root.absolutePath} (pkg=$targetPkg)")
         } catch (e: Exception) {
