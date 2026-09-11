@@ -130,7 +130,9 @@ object SandboxManager {
         //   /data/user/0/com.aether/vision   (ไม่ใช่ .../files/vision)
         sandboxRoot = File(context.dataDir, "vision")
         sandboxRoot?.mkdirs()
-        spoofRootEnvironment()
+        // [CUT 2026-09-11] spoofRootEnvironment — resetprop/magiskpolicy
+        // (ปลอม env root/debuggable/secure) ทำให้แอพกั๊กตัวเอง งดก่อนทดสอบ
+        // spoofRootEnvironment()
         Log.i(TAG, "sandbox root = ${sandboxRoot?.absolutePath}")
     }
 

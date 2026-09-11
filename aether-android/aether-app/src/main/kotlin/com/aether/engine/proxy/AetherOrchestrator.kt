@@ -110,10 +110,12 @@ object AetherOrchestrator {
             // IO virtualization + hide detection + DEX loading
             try {
                 com.aether.Engine.enableIO()
-                com.aether.Engine.hideXposed()
-                com.aether.Engine.installNetworkHttpProbe()
-                com.aether.Engine.loadEmptyDex()
-                Log.d(TAG, "IO system, HideXposed, Network Probe, Empty DEX initialized")
+                // [CUT 2026-09-11] protection — hideXposed/network-probe/empty-dex
+                // ทำให้แอพกั๊กตัวเอง งดก่อนทดสอบการทำงานหลัก
+                // com.aether.Engine.hideXposed()
+                // com.aether.Engine.installNetworkHttpProbe()
+                // com.aether.Engine.loadEmptyDex()
+                Log.d(TAG, "IO system initialized (protection disabled for test)")
             } catch (e: Throwable) {
                 Log.w(TAG, "Phase 5 init: ${e.message}")
             }

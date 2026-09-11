@@ -46,14 +46,16 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
     g_vm = vm;
     JNIEnv* e;
     if (vm->GetEnv(reinterpret_cast<void**>(&e), JNI_VERSION_1_6) != JNI_OK) return JNI_ERR;
-    aether::Stealth::blockDebugger();
+    // [CUT 2026-09-11] anti-debug/protection — ทำให้แอพปิดตัวเองบนเครื่องจริง
+    // (PTRACE_TRACEME + PR_SET_DUMPABLE=0) — งดก่อนเพื่อทดสอบการทำงานหลัก
+    // aether::Stealth::blockDebugger();
 
     char sdk[PROP_VALUE_MAX];
     int api = (__system_property_get("ro.build.version.sdk", sdk) > 0) ? atoi(sdk) : 0;
-    aether::Flagger::probeSdk(api);
+    // [CUT] aether::Flagger::probeSdk(api);
 
     // Portable env probe (no hard-fail)
-    (void)aether::EnvCheck::probe();
+    // [CUT] (void)aether::EnvCheck::probe();
     // JNIEnv hook 4 slots — best-effort (no hard-fail)
     (void)aether::JniHook::install(e);
 
