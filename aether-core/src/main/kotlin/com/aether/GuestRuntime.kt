@@ -6,6 +6,7 @@ import android.content.ContentProvider
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.ProviderInfo
+import android.os.Binder
 import android.util.Log
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
@@ -264,17 +265,24 @@ class GuestRuntime private constructor(
             // SecurityException (verified: dynamite measurement 'Unknown calling
             // package name' kills main thread). These providers are NOT needed
             // for the game itself to run; installing them only risks crashes.
+            // Skip ONLY providers that make external binder calls to GMS
+            // measurement/ads services during onCreate — these throw
+            // SecurityException on the main thread that disrupts game init
+            // even when caught by the firewall (aborts Handler dispatch).
+            // PlayGamesInitProvider + FirebaseInitProvider are ALLOWED:
+            // they init SDK state the game expects; their binder calls are
+            // contained by Binder.clearCallingIdentity (step 2) + firewall.
             val skipPrefixes = listOf(
-                "com.google.android.gms.",   // Play services (ads, games, measurement)
-                "com.google.firebase.",      // Firebase (measurement dynamite = main-thread killer)
-                "io.bidmachine.",            // ads
-                "com.vungle.",               // ads
-                "com.ironsource.",           // ads
-                "com.applovin.",             // ads
-                "com.facebook.ads.",         // FB audience network
+                "com.google.android.gms.ads",           // MobileAdsInitProvider → external
+                "com.google.android.gms.measurement",   // AppMeasurement → dynamite killer
+                "io.bidmachine.",                       // ads
+                "com.vungle.",                          // ads
+                "com.ironsource.",                      // ads
+                "com.applovin.",                        // ads
+                "com.facebook.ads.",                    // FB audience network
             )
             if (skipPrefixes.any { providerClass.startsWith(it) }) {
-                return "skipped (ads/gms provider — unsafe under virtual UID)"
+                return "skipped (ads/measurement provider — unsafe under virtual UID)"
             }
             val cls = loader.loadClass(providerClass)
             val provider = cls.getDeclaredConstructor().newInstance() as? ContentProvider
@@ -289,7 +297,16 @@ class GuestRuntime private constructor(
                 exported = false
                 enabled = true
             }
-            provider.attachInfo(guestContext, info)
+            // SNAKE R2/Q2 pattern: clearCallingIdentity prevents the system
+            // from checking Binder.getCallingUid() during provider attach.
+            // Without this, providers that query PackageManager during
+            // attachInfo get SecurityException (host UID ≠ guest package).
+            val token = Binder.clearCallingIdentity()
+            try {
+                provider.attachInfo(guestContext, info)
+            } finally {
+                Binder.restoreCallingIdentity(token)
+            }
             true
         } catch (e: Throwable) {
             "${e.javaClass.simpleName}: ${e.message}"

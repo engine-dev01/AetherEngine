@@ -118,6 +118,8 @@ object ServiceBinderProxy {
             createProxyForService(SERVICE_ACCOUNT, svcManager, "account")
             createProxyForService(SERVICE_LOCATION, svcManager, "location")
             createProxyForService(SERVICE_NOTIFICATION, svcManager, "notification")
+            createProxyForService(SERVICE_SHORTCUT, svcManager, "shortcut")
+            createProxyForService(SERVICE_USAGE_STATS, svcManager, "usagestats")
 
             Log.i(TAG, "Initialized ${proxyCache.size} service proxies")
         } catch (e: Exception) {
@@ -378,6 +380,23 @@ object ServiceBinderProxy {
                 "account"     -> "android.accounts.IAccountManager"
                 "location"    -> "android.location.ILocationManager"
                 "notification" -> "android.app.INotificationManager"
+                else -> return null
+            }
+            Class.forName(className)
+        } catch (e: ClassNotFoundException) {
+            Log.w(TAG, "IInterface class not found for $serviceName")
+            null
+        }
+    }
+}
+e(className)
+        } catch (e: ClassNotFoundException) {
+            Log.w(TAG, "IInterface class not found for $serviceName")
+            null
+        }
+    }
+}
+nager"
                 else -> return null
             }
             Class.forName(className)
