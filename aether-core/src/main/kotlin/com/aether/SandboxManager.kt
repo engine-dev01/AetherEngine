@@ -139,19 +139,105 @@ object SandboxManager {
     // ══════════════════════════════════════════
  // 1. package.conf — Manifest Snapshot (Binary format)
     // ══════════════════════════════════════════
+    /** Metadata keys ที่ serializer เขียนลง package.conf — ชุดเดียวกับที่
+     *  PackageConfParser รู้จัก (com.facebook/gms/play/pangle keys จาก §3) */
+    private val PACKAGE_CONF_META_KEYS = setOf(
+        "com.facebook.sdk.ApplicationId", "com.facebook.sdk.ClientToken",
+        "com.google.android.gms.ads.APPLICATION_ID", "com.google.android.gms.games.APP_ID",
+        "com.google.android.gms.version", "com.google.android.gms.games.version",
+        "com.google.android.play.billingclient.version", "com.bytedance.sdk.pangle.version",
+        "com.android.stamp.type", "APP_NAME",
+    )
     /**
-     * DEPRECATED stub generator. It fabricated engine components
-     * (com.aether.AetherHostActivity/ProxyActivity) which is WRONG — a target's
-     * package.conf must describe the TARGET app, never the engine. The real
-     * guest manifest is now read live from the installed APK via
-     * PackageManager (ProxyActivity.readGuestManifest). Kept only as a
-     * last-resort empty marker; callers should NOT rely on it.
+     * สร้าง package.conf (manifest snapshot) จาก PackageManager ของเครื่องจริง
+     * — ตาม blueprint ต้นแบบ (SNAKE lv0.p: root/data/app/<pkg>/package.conf
+     * ที่ engine เขียนตอน install หลัง PackageParser.parse + collectCertificates).
      *
-     * Returns an empty byte array so bootstrapGameData does not write a
-     * misleading stub into the sandbox.
+     * format: UTF-16LE header (classloader name) + UTF-8 length-prefixed body
+     * (component names + metadata + version + apk path) — ตรงกับที่
+     * PackageConfParser อ่าน (dual-encoding — test ยืนยัน)
+     *
+     * ไม่ใช่ stub/คัดลอกไฟล์ข้ามเครื่อง — สร้างจากข้อมูลจริงของเครื่องนี้
+     * (per-install: sourceDir/signature/versionCode ต่างกันทุกเครื่อง)
      */
-    @Deprecated("package.conf is read live from PackageManager; do not fabricate")
-    fun generatePackageConf(target: String = targetPkg): ByteArray = ByteArray(0)
+    fun generatePackageConf(target: String = targetPkg): ByteArray {
+        val ctx = appContext ?: return ByteArray(0)
+        return try {
+            val pm = ctx.packageManager
+            val flags = android.content.pm.PackageManager.GET_ACTIVITIES or
+                android.content.pm.PackageManager.GET_SERVICES or
+                android.content.pm.PackageManager.GET_RECEIVERS or
+                android.content.pm.PackageManager.GET_PROVIDERS or
+                android.content.pm.PackageManager.GET_META_DATA
+            val pi = pm.getPackageInfo(target, flags)
+            val appInfo = pi.applicationInfo ?: return ByteArray(0)
+
+            // components (FQCN ตามที่ parser จำแนก: Activity/Service/Provider/Receiver)
+            val activities = pi.activities?.mapNotNull { it.name } ?: emptyList()
+            val services = pi.services?.mapNotNull { it.name } ?: emptyList()
+            val providers = pi.providers?.mapNotNull { it.name } ?: emptyList()
+            val receivers = pi.receivers?.mapNotNull { it.name } ?: emptyList()
+
+            // launcher activity (MAIN/LAUNCHER intent resolve — เหมือน readGuestManifest)
+            val launcher = try {
+                pm.getLaunchIntentForPackage(target)?.component?.className
+            } catch (_: Throwable) { null }
+
+            // metadata ที่ parser รู้จัก — จาก ApplicationInfo.metaData
+            // (ไม่ผูกกับ META_KEYS ของ parser — ใช้ชุด key ตรงตาม blueprint §3)
+            val meta = appInfo.metaData
+            val metadata = LinkedHashMap<String, String>()
+            if (meta != null) {
+                for (key in PACKAGE_CONF_META_KEYS) {
+                    val v = meta.get(key) ?: continue
+                    metadata[key] = v.toString()
+                }
+            }
+
+            val out = java.io.ByteArrayOutputStream()
+            // UTF-16LE header (classloader name — เหมือน artifact จริง)
+            utf16(out, "com.app.framework.core.system.pm.BPackage")
+            // UTF-8 body — components + metadata + version + apk path
+            appInfo.className?.let { utf8(out, it) }                    // Application
+            utf8(out, "androidx.core.app.CoreComponentFactory")         // appComponentFactory
+            launcher?.let { utf8(out, it) }                             // launcher activity
+            activities.forEach { utf8(out, it) }
+            services.forEach { utf8(out, it) }
+            providers.forEach { utf8(out, it) }
+            receivers.forEach { utf8(out, it) }
+            metadata.forEach { (k, v) -> utf8(out, k); utf8(out, v) }
+            pi.versionName?.let { utf8(out, it) }                       // version (ก่อน base.apk)
+            appInfo.sourceDir?.let { utf8(out, it) }                    // apk path (base.apk)
+            out.toByteArray()
+        } catch (e: Throwable) {
+            Log.e(TAG, "generatePackageConf failed: ${e.message}")
+            ByteArray(0)
+        }
+    }
+
+    // ── Parcel string encoder (ตรงกับ PackageConfParser.readStrings) ──
+
+    /** UTF-8 length-prefixed parcel string: int32 len + bytes + null + pad4 */
+    private fun utf8(out: java.io.ByteArrayOutputStream, s: String) {
+        val b = s.toByteArray(Charsets.UTF_8)
+        val ln = b.size
+        out.write(ln and 0xff); out.write((ln ushr 8) and 0xff)
+        out.write((ln ushr 16) and 0xff); out.write((ln ushr 24) and 0xff)
+        out.write(b); out.write(0)
+        var consumed = 4 + ln + 1
+        while (consumed % 4 != 0) { out.write(0); consumed++ }
+    }
+
+    /** UTF-16LE length-prefixed parcel string: int32 charCount + chars + u16 null + pad4 */
+    private fun utf16(out: java.io.ByteArrayOutputStream, s: String) {
+        val ln = s.length
+        out.write(ln and 0xff); out.write((ln ushr 8) and 0xff)
+        out.write((ln ushr 16) and 0xff); out.write((ln ushr 24) and 0xff)
+        out.write(s.toByteArray(Charsets.UTF_16LE))
+        out.write(0); out.write(0)
+        var consumed = 4 + ln * 2 + 2
+        while (consumed % 4 != 0) { out.write(0); consumed++ }
+    }
 
     // ══════════════════════════════════════════
  // 2. Sandbox structure (ครบตาม blueprint)
@@ -302,13 +388,31 @@ object SandboxManager {
             //    จริงถูก provision มาแล้ว (จาก dump) ก็เก็บไว้; ไม่มีก็ไม่เขียน stub.
             // (generatePackageConf ถูก deprecate — เขียน stub = ผิดหลักการ)
 
-            // 2. PGL modules — เกมเขียนเองตอนรัน (หลักฐาน: ขนาดไฟล์ต่างข้ามเครื่อง
+            // 3. package.conf — manifest snapshot (engine เขียน registry เอง
+            //    จากเครื่องจริง — per-install: sourceDir/signature/versionCode
+            //    ต่างกันทุกเครื่อง ห้ามคัดลอกไฟล์ข้ามเครื่อง)
+            //    blueprint: SNAKE lv0.p() = root/data/app/<pkg>/package.conf
+            try {
+                val confFile = File(root, "data/app/$targetPkg/package.conf")
+                if (!confFile.exists() || confFile.length() < 32) {
+                    val bytes = generatePackageConf(targetPkg)
+                    if (bytes.isNotEmpty()) {
+                        confFile.parentFile?.mkdirs()
+                        confFile.writeBytes(bytes)
+                        Log.i(TAG, "package.conf written (${bytes.size}B) for $targetPkg")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "package.conf write failed: ${e.message}")
+            }
+
+            // 4. PGL modules — เกมเขียนเองตอนรัน (หลักฐาน: ขนาดไฟล์ต่างข้ามเครื่อง
             //    = เกม generate ตามเวอร์ชัน/ตำแหน่งของมัน เหมือนแอปปกติ)
             //    engine ไม่ต้อง pre-create dir หรือ copy .so ใด ๆ — redirect
             //    path ทำให้เกมเขียนลง sandbox เอง (SNAKE dump พิสูจน์: ไฟล์เกม
             //    ใน sandbox ต้นแบบ = เกมสร้างตอน runtime)
 
-            // 3. fake /proc + /system
+            // 5. fake /proc + /system
             File(root, "proc/0/cmdline").writeText(targetPkg)
             File(root, "system/uid.conf").writeText("# AetherEngine virtual UID conf\n")
             File(root, "system/user.conf").writeText("# AetherEngine virtual user conf\n")
