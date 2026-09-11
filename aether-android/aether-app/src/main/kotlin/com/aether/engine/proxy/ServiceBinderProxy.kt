@@ -305,7 +305,9 @@ object ServiceBinderProxy {
             return try {
                 val methodName = method.name
                 // ป้องกัน "Calling package name mismatch" จาก Play Games shortcuts
-                if (methodName == "getShortcuts" || methodName.contains("shortcut")) {
+                // (case-insensitive — จริง ๆ เกมเรียก getDynamicShortcuts ด้วย S ใหญ่)
+                if (methodName.equals("getShortcuts", ignoreCase = true) ||
+                    methodName.contains("shortcut", ignoreCase = true)) {
                     Log.d(TAG, "Blocked shortcut call: $methodName for ${overridePackage ?: originalPackage}")
                     return emptyList<Any>() // Return ค่าว่างแทนที่จะ throw
                 }
@@ -445,6 +447,8 @@ object ServiceBinderProxy {
                 "netstats"    -> "android.net.INetworkStatsService"
                 "display"     -> "android.view.IDisplayManager"
                 "primary_clip"-> "android.content.IPrimaryClip"
+                "shortcut"    -> "android.content.pm.IShortcutService"
+                "usagestats"  -> "android.app.usage.IUsageStatsManager"
                 "package"     -> "android.content.pm.IPackageManager"
                 "jobscheduler" -> "android.app.job.IJobScheduler"
                 "mount"       -> "android.os.storage.IStorageManager"
