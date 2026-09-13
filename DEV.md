@@ -91,11 +91,13 @@ init() →
 export ANDROID_HOME=/path/to/android-sdk
 export PATH=$PATH:$ANDROID_HOME/platform-tools
 
-# Native lib only
-cd aether-native && ./gradlew :aether-native:assembleDebug
+# Kotlin modules + native engine (root Gradle wrapper — ตัวเดียวใน repo)
+./gradlew :aether-core:compileDebugKotlin \
+         :aether-android:compileDebugKotlin \
+         :aether-native:externalNativeBuildDebug
 
-# Full APK
-cd app/android && ./gradlew :app:assembleDebug
+# Full APK — ผ่าน Flutter เท่านั้น (app/android wrapper สร้างโดย flutter tool)
+cd app && flutter build apk --release
 ```
 
 ## Test pipeline (T1)
