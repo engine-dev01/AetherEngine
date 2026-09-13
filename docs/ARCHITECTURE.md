@@ -41,8 +41,8 @@ without code rewrite (Phase 11 + future).
 │  Flutter shell (app/lib/)                          │
 │  - Home screen (banner + game card + paywall)       │
 │  - 5 i18n langs (EN, FIL, MAL, ID, ES)              │
-│  - Phase 10: Games registry (data/games.dart)         │
-│  - 2 MethodChannels (launchGame, openPlayStore)      │
+│  - Phase 10: Games registry (data/games.dart)       │
+│  - MethodChannel com.aether/engine_bridge — 15 methods (incl. key-1234 chainCheck/handshakeStatus) │
 │  - Snake assets (5 SVG + 4 fonts) bundled           │
 └─────────────────────────────────────────────────────┘
 ```
@@ -64,8 +64,11 @@ scripts/          # Test pipeline (preflight, test-local, test-ci)
 
 ## Boundaries
 
-- **Tier 1 → Tier 2:** JNI contract (35 methods). Verify via preflight G3.
-- **Tier 2 → Tier 3:** MethodChannel `com.aether/engine_bridge`. Slim — only 2 methods.
+- **Tier 1 → Tier 2:** JNI contract (38 methods 1:1 Engine.kt ↔ aether_core.cpp). Verify via preflight G3 + scripts/jni_parity.py.
+- **Tier 2 → Tier 3:** MethodChannel `com.aether/engine_bridge` — 15 methods
+  (launchGame/isTargetInstalled/launchInSandbox/launchApp/getEngineStatus/getEngineStats/
+   getVirtualAppStatus/testVirtualFS/readMemory/scanAOB/nativeCompute/compressPayload/
+   readDiag/**chainCheck**/**handshakeStatus** — 2 ตัวหลัง = key-1234 chain probe)
 - **External:** Snake's libengine.so (8.5 MB, OLLVM) is opt-in via EngineLoader.
 
 ## Why this design

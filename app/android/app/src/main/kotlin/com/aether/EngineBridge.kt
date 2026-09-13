@@ -92,6 +92,10 @@ object EngineBridge : MethodCallHandler {
                     call.argument<String>("packageName") ?: ""
                 ))
                 "readDiag" -> result.success(readDiag())
+                "chainCheck" -> result.success(chainCheck(
+                    call.argument<String>("packageName") ?: ""
+                ))
+                "handshakeStatus" -> result.success(handshakeStatus())
                 else -> result.notImplemented()
             }
         } catch (e: Throwable) {
@@ -332,6 +336,87 @@ object EngineBridge : MethodCallHandler {
             sb.toString()
         } catch (e: Throwable) {
             "readDiag failed: ${e.message}"
+        }
+    }
+
+    // ══════════════════════════════════════════
+    //  chainCheck — จำลองปุ่ม "1234" (UI test key) พิสูจน์ hop ต่อ hop
+    //  ปุ่มกด → EngineBridge → Orchestrator → VirtualAppContainer →
+    //  ServiceBinderProxy(sCache) → GuestProcessTable(slot) → provider call
+    //  ทุกขั้นรายงานสถานะจริงของตัวเอง กลับเป็นข้อความเดียว
+    // ══════════════════════════════════════════
+
+    private fun chainCheck(packageName: String): String {
+        val c = ctx ?: return "✗ bridge: no context"
+        val sb = StringBuilder()
+        // hop1: identity pair (guest upgrade path)
+        val vac = com.aether.engine.proxy.VirtualAppContainer
+        sb.append("[1] identity real=${vac.getRealPackageName()} fake=${vac.getFakePackageName()}\n")
+        // hop2: sCache wrappers ติดตั้งจริงกี่ key (ใน process ที่ bridge รัน = main)
+        sb.append("[2] ${com.aether.engine.proxy.ServiceBinderProxy.sCacheVerify()}\n")
+        sb.append("[2b] proxies=${com.aether.engine.proxy.ServiceBinderProxy.listProxiedServices().size}\n")
+        // hop3: AMS singleton (ของจริงเป็น BinderProxy — ของเราเป็น java Proxy)
+        sb.append("[3] ")
+        sb.append(try {
+            val am = Class.forName("android.app.ActivityManager")
+            val sf = am.getDeclaredField("IActivityManagerSingleton")
+            sf.isAccessible = true
+            val sing = sf.get(null)
+            var cc: Class<*>? = sing.javaClass
+            var inst: Any? = null
+            while (cc != null) {
+                try {
+                    val mf = cc.getDeclaredField("mInstance")
+                    mf.isAccessible = true
+                    inst = mf.get(sing)
+                    break
+                } catch (_: NoSuchFieldException) { cc = cc.superclass }
+            }
+            val n = inst?.javaClass?.name ?: "null"
+            if (java.lang.reflect.Proxy.isProxyClass(inst?.javaClass ?: Object::class.java))
+                "AMS mInstance=PROXY ✓ (tz.i parity)"
+            else "AMS mInstance=REAL ($n) — singleton replace ยังไม่ landing"
+        } catch (e: Throwable) { "AMS singleton read failed: ${e.message}" })
+        sb.append("\n")
+        // hop4: guest slot table (server side)
+        sb.append("[4] ${com.aether.engine.proxy.GuestProcessTable.status()}\n")
+        // hop5: child holder config (ถ้าตรวจใน :pN จะเห็น; main = null ปกติ)
+        val hc = com.aether.engine.proxy.GuestProcessHolder.config
+        sb.append("[5] childConfig=" + (hc?.let { "${it.guestPkg} slot=${it.slot}" } ?: "none(main? OK)"))
+        sb.append("\n")
+        // hop6: target installed? (ปุ่ม Play precheck เดียวกัน)
+        if (packageName.isNotEmpty()) {
+            sb.append("[6] installed(")
+            sb.append(packageName)
+            sb.append(")=")
+            sb.append(try {
+                c.packageManager.getPackageInfo(packageName, 0); "yes"
+            } catch (_: Throwable) { "NO" })
+        }
+        return sb.toString()
+    }
+
+    /**
+     * handshakeStatus — จำลอง a7.m() provider call จริง (method "_Aether_|_init_process_")
+     * ผ่าน provider ฝั่งเดียวกัน (P0 ทำงานใน :p0 → call ข้าม process จริง)
+     * ใช้กดจาก UI เพื่อตรวจ child ตอบ config + IBinder กลับไหม โดยไม่ต้อง launch เกม
+     */
+    private fun handshakeStatus(): String {
+        val c = ctx ?: return "✗ no context"
+        return try {
+            val uri = android.net.Uri.parse("content://com.aether.proxy.content.0")
+            val extras = android.os.Bundle().apply {
+                putString("guest_pkg", "com.aether.test.chaincheck")
+                putInt("slot", 0)
+                putInt("user_id", android.os.Process.myUid() / 100000)
+            }
+            val reply = c.contentResolver.call(uri,
+                com.aether.engine.proxy.GuestProcessTable.METHOD_INIT, null, extras)
+            if (reply == null) "✗ reply=null"
+            else "success=${reply.getBoolean("success")} err=${reply.getString("error")} " +
+                "clientBinder=${reply.getBinder(com.aether.engine.proxy.GuestProcessTable.BUNDLE_CLIENT) != null}"
+        } catch (e: Throwable) {
+            "✗ ${e.javaClass.simpleName}: ${e.message}"
         }
     }
 

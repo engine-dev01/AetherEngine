@@ -164,6 +164,27 @@ object ServiceBinderProxy {
     }
 
     /**
+     * chainCheck ใช้พิสูจน์ "callต่อไป": sCache ของ process นี้มี wrapper ของเรา
+     * จริงกี่ key จาก 11 — OK=wrapper / REAL=ของจริงครอง / EMPTY=ไม่มี
+     */
+    fun sCacheVerify(): String {
+        val cache = serviceManagerCache() ?: return "sCache UNAVAILABLE (hidden-API?)"
+        val keys = proxyCache.keys.mapNotNull { sCacheKeyOf(it) }.sorted()
+        val sb = StringBuilder()
+        var ok = 0
+        for (k in keys) {
+            val v = cache[k]
+            val st = when {
+                v == null -> "EMPTY"
+                v.javaClass.name.contains("BinderWrapper") -> { ok++; "OK" }
+                else -> "REAL"
+            }
+            sb.append("$k=$st ")
+        }
+        return "sCache $ok/${keys.size}: $sb"
+    }
+
+    /**
      * ตรวจสอบว่า proxy พร้อมใช้งานหรือไม่
      */
     fun isInitialized(): Boolean = proxyCache.isNotEmpty()

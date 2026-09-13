@@ -335,6 +335,52 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  // ─── "1234" test key — จำลองปุ่มเริ่มเกม: ตรวจ call stack ทีละ hop ───
+  // ปุ่ม Play จริง: isTargetInstalled → launchInSandbox → Orchestrator →
+  // VirtualAppContainer → ServiceBinderProxy(sCache) → GuestProcessTable →
+  // ProxyContentProvider.call("_Aether_|_init_process_") → child holder
+  // คีย์ 1234 เรียก chainCheck(hop 1-6 ในเครื่อง) + handshakeStatus (provider call
+  // จริงข้าม :p0) แล้วแสดงผลเป็นข้อความ — ไม่ต้อง launch เกมก็เห็นสอดคล้องกัน
+  Future<void> _chainCheck1234() async {
+    await _busyWrap(() async {
+      final pkg = _game.packageName;
+      final hops = await _channel.invokeMethod<String>(
+        'chainCheck', {'packageName': pkg});
+      final hs = await _channel.invokeMethod<String>('handshakeStatus');
+      if (!mounted) return;
+      final report = '═══ KEY 1234 — call-stack chain check ═══\n'
+          '${hops ?? "(null)"}\n'
+          '── provider handshake (a7.m simulation, slot 0) ──\n'
+          '${hs ?? "(null)"}\n\n'
+          'PASS = ทุก hop ตอบสอดคล้อง; "REAL"/"✗" = จุดที่ chain ขาด';
+      setState(() => _lastOp = 'chainCheck done');
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF11151A),
+          title: const Text('Chain check — key 1234',
+              style: TextStyle(color: Colors.white, fontSize: 14)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: SelectableText(
+                report,
+                style: const TextStyle(
+                    color: Color(0xFF9CCC65), fontSize: 10, fontFamily: 'monospace'),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
   void _readMore() => _snack('Coming soon');
   void _getSubscription() => _snack('Subscription API not available in offline build');
 
@@ -523,6 +569,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _capBtn(Icons.compress, 'Compress', _compressPayload, const Color(0xFF4DB6AC)),
         _capBtn(Icons.folder_special, 'Virtual FS', _testVirtualFS, const Color(0xFF4FC3F7)),
         _capBtn(Icons.bug_report, 'Diag', _showDiag, const Color(0xFFFF8A65)),
+        _capBtn(Icons.key, '1234 chain-check', _chainCheck1234, const Color(0xFFFFD54F)),
       ]),
     );
   }
