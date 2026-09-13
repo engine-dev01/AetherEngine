@@ -139,7 +139,9 @@ open class ProxyActivity : Activity() {
                     // ตรวจ className==stubComponent fail → passthrough ตัว bootstrap
                     // (ProxyActivity ไม่ใช่เกม) รัน onCreate ของเกม → ตาย → UI เด้ง
                     // = regression ของตัวเอง; ใช้ component จริงของ instance นี้เสมอ
-                    val selfStub = component?.className
+                    // Activity.getComponentName() → synthetic 'componentName'
+                    // ('component' ไม่มีบน Activity — CI run 34774695761 fail)
+                    val selfStub = componentName?.className
                         ?: "com.aether.engine.proxy.ProxyActivity\$P0"
                     val hooked = AetherInstrumentation.install(
                         stubComponent = selfStub,
