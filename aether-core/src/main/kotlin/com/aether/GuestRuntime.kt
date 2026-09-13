@@ -259,7 +259,24 @@ class GuestRuntime private constructor(
                 }
             }
         }
-        // 3. CompatibilityInfo changes when processName != packageName; the
+        // 3. Android 16 (verified device: aether-live2 applied=false on 1+2):
+        //    the cache lives in AppBindData — every public read path resolves
+        //    there: Application.getProcessName() → ActivityThread
+        //    .currentProcessName() → am.mBoundApplication.processName (AOSP 16
+        //    ActivityThread.java:452 field, :968 String processName, :2940).
+        //    SNAKE1 parity proof: its crashlytics folder (written by the game's
+        //    own SDK) is .crashlytics.v3/com.miniclip.eightballpool/ — main name,
+        //    never "com.snake:p0" → SNAKE rewrites exactly this field.
+        if (!applied) {
+            val bound = fieldValueOrNull(at, "mBoundApplication")
+            if (bound != null) {
+                applied = setFieldIfPresent(bound, "processName", name)
+                Log.i(TAG, "spoofProcessName: mBoundApplication.processName → $name (applied=$applied)")
+            } else {
+                Log.w(TAG, "spoofProcessName: mBoundApplication is null (not yet bound?)")
+            }
+        }
+        // 4. CompatibilityInfo changes when processName != packageName; the
         //    framework caches it. Clear it so it recomputes as "main process".
         val ciField = findField(at.javaClass, "mCompatibilityInfo")
         if (ciField != null) {
