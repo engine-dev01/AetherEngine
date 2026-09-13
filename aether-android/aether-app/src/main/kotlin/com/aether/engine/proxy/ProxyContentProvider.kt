@@ -38,6 +38,12 @@ open class ProxyContentProvider : ContentProvider() {
     }
 
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
+        // ★ ขั้น ② — provider handshake (SNAKE ProxyContentProvider.java:15):
+        // framework ติดตั้ง provider ตอน spawn :pN → server เรียก method นี้เพื่อ
+        // ยื่น p3 config ก่อน activity ใด ๆ มาถึง → child เก็บ identity ไว้
+        if (GuestProcessTable.METHOD_INIT == method) {
+            return GuestProcessHolder.handleInit(extras)
+        }
         if (METHOD_ROUTE != method) {
             return Bundle().apply { putBoolean("success", false); putString("error", "unknown method: $method") }
         }

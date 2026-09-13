@@ -29,7 +29,15 @@ open class ProxyActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val targetPkg = intent.getStringExtra("target_package") ?: "com.aether"
+        // ★ p3-first identity (SNAKE semantics: ทุก getter ใน child อ่าน jv0.D2()
+        //   = p3 ไม่ใช่ intent — jv0.E2():58): ถ้า handshake ยื่น config ตอน
+        //   provider install แล้ว ให้ config ชนะ intent extras เสมอ
+        val p3 = GuestProcessHolder.config
+        val intentPkg = intent.getStringExtra("target_package") ?: "com.aether"
+        val targetPkg = p3?.guestPkg?.takeIf { it.isNotEmpty() } ?: intentPkg
+        if (p3 != null && p3.guestPkg != intentPkg) {
+            DiagLog.d("ProxyActivity", "identity: p3=${p3.guestPkg} overrides intent=$intentPkg")
+        }
         val isVirtual = targetPkg.isNotEmpty() && targetPkg != "com.aether"
 
         // VirtualFS data isolation: the guest must read/write its OWN sandboxed
@@ -45,6 +53,15 @@ open class ProxyActivity : Activity() {
         DiagLog.d("ProxyActivity", "ctx: application=${application?.javaClass?.name} " +
             "getResources=${runCatching { resources != null }.getOrNull()} " +
             "appCtx=${applicationContext?.javaClass?.name}")
+
+        // 0. ★ ขั้น ②: ถ้า provider handshake (call METHOD_INIT) เกิดขึ้นแล้ว —
+        //    GuestProcessHolder.config ถูก set ตอน framework install provider
+        //    (ก่อนถึงตรงนี้) → log ยืนยัน; ยังไม่มี (fallback path) → seed จาก intent
+        GuestProcessHolder.config
+            ?.also { DiagLog.d("ProxyActivity", "p3 via handshake: slot=${it.slot} pkg=${it.guestPkg}") }
+            ?: intent.getIntExtra("guest_slot", -1).let { s ->
+                if (s >= 0) GuestProcessHolder.seed(targetPkg, s)
+            }
 
         // 1. ตั้ง VirtualAppContainer ใน :p0/:p1/:p2/:p3 (เตรียม hooks)
         try {

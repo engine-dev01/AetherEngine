@@ -500,13 +500,37 @@ object AetherOrchestrator {
             //    a real app's Application.onCreate in main crashes the UI when the
             //    guest spawns threads that hit an unbound context (prototype jv0.O2
             //    runs in the proxy process for exactly this isolation).
+            // 4a. ★ ขั้น ② (a7.w/u:292 + a7.m:171 parity) — จอง slot + provider
+            //     handshake: ContentResolver.call(content://com.aether.proxy.content.N,
+            //     "_Aether_|_init_process_", cfg) → Android spawn :pN เอง (framework
+            //     ติดตั้ง provider ตาม manifest process=) → child ตอบ IBinder กลับ
+            //     → linkToDeath คุมชีพ + config ถึง child ก่อน activity dispatch
+            val slot = GuestProcessTable.allocate(context, targetPkg)
+            var handshook = false
+            if (slot >= 0) {
+                // p3.r semantics = ANDROID USER id (0..9) — ไม่ใช่ uid (SNAKE p3.p/q
+                // ต่างหากที่ถือ uid); A16: userId = uid / 100000
+                handshook = GuestProcessTable.spawnAndConfig(
+                    context, ClientConfig(targetPkg, slot, android.os.Process.myUid() / 100000),
+                )
+            } else {
+                Log.w(TAG, "launchInSandbox: no free slot (a7:317 semantics) → P0 fallback")
+            }
+
+            // 4b. start activity stub บน slot ที่ handshake สำเร็จ (r1.k/kl0 parity:
+            //     stub component ต้องตรงกับ process suffix ของ provider ที่ปลุกขึ้น)
             val proxy = Intent()
-            proxy.setClassName(context, "com.aether.engine.proxy.ProxyActivity\$P0")
+            proxy.setClassName(
+                context,
+                "com.aether.engine.proxy.ProxyActivity\$P${if (handshook) slot else 0}",
+            )
             proxy.putExtra("target_package", targetPkg)
             proxy.putExtra("target_sandbox", SandboxManager.getSandboxRoot()?.absolutePath)
+            if (handshook) proxy.putExtra("guest_slot", slot)
             proxy.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(proxy)
-            Log.i(TAG, "launchInSandbox: ProxyActivity.P0 dispatched for $targetPkg (guest loads in :p0)")
+            Log.i(TAG, "launchInSandbox: ProxyActivity.P${if (handshook) slot else "0(fallback)")}" +
+                " dispatched for $targetPkg (handshake=$handshook)")
             true
         } catch (e: Throwable) {
             Log.e(TAG, "launchInSandbox failed: ${e.message}")
