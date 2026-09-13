@@ -60,6 +60,11 @@ echo ""
 echo "[G3] JNI parity (Engine.kt ↔ aether_core.cpp)"
 python3 scripts/jni_parity.py && PASS=$((PASS+1)) || { FAIL=$((FAIL+1)); err "JNI parity (descriptor mismatch → RegisterNatives fails → libaether JNI_ERR)"; }
 
+# G3b: Native chain parity (T1 evidence F2 ↔ ของเรา: table + kt + call-site placement)
+echo ""
+echo "[G3b] Native chain parity (codes/Codes evidence vs run-chain call-sites)"
+python3 scripts/native_chain_parity.py > /tmp/native_chain_parity.out 2>&1 && { PASS=$((PASS+1)); tail -2 /tmp/native_chain_parity.out; } || { FAIL=$((FAIL+1)); cat /tmp/native_chain_parity.out; err "chain hop ขาด/วางผิดตำแหน่ง (root cause เกมไม่รัน — ดู output ข้างบน)"; }
+
 # G4: Unresolved reference
 echo ""
 echo "[G4] Unresolved reference check (semantic)"
@@ -95,7 +100,7 @@ echo ""
 echo "[G6] GitHub release state"
 if [ -n "$GITHUB_TOKEN" ]; then
     if curl -sS -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
-        "https://api.github.com/repos/aether-dev-oss/AetherEngine/releases/latest" 2>/dev/null | \
+        "https://api.github.com/repos/engine-dev01/AetherEngine/releases/latest" 2>/dev/null | \
         python3 -c "import json,sys; d=json.load(sys.stdin); print('  ✅', d.get('tag_name', 'no release'))" 2>/dev/null; then
         :
     else
