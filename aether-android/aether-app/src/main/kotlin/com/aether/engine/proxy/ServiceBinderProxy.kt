@@ -535,8 +535,20 @@ object ServiceBinderProxy {
                 // SNAKE ob.invoke fallback = method.invoke(realIface, args) — delegate
                 // ตรงไปยัง IInterface ตัวจริง (ไม่ต้องแปลงเป็น binder/transact เอง)
                 method.invoke(realIface, *(modifiedArgs ?: emptyArray()))
+            } catch (e: java.lang.reflect.InvocationTargetException) {
+                // ★ logcat 00:31:20.797 (com.aether_1.zip): เดิม catch(e:Exception)
+                // กลืน InvocationTargetException (message=null) → คืน null →
+                // ActivityThread "Failed to find provider info for
+                // com.aether.proxy.content.1" → provider-spawn slot 1-3 พังทั้งแถบ
+                // = symptom-level ซ่อนต้นเหตุจริง; ทำตาม default branch ด้านบน:
+                // rethrow cause เพื่อให้ AOSP เห็น NameNotFound จริง (semantics
+                // เดิมของ IPackageManager — caller มี try/catch อยู่แล้ว)
+                Log.w(TAG, "Package proxy rethrow ${method.name}: " +
+                    "${e.cause?.javaClass?.simpleName}: ${e.cause?.message}")
+                throw (e.cause as? Exception) ?: Exception(e)
             } catch (e: Exception) {
-                Log.w(TAG, "Package proxy call failed: ${e.message}")
+                Log.w(TAG, "Package proxy call failed ${method.name}: " +
+                    "${e.javaClass.simpleName}: ${e.message}")
                 null
             }
         }
@@ -554,7 +566,11 @@ object ServiceBinderProxy {
                 if (methodName.equals("getShortcuts", ignoreCase = true) ||
                     methodName.contains("shortcut", ignoreCase = true)) {
                     Log.d(TAG, "Blocked shortcut call: $methodName for ${overridePackage ?: originalPackage}")
-                    return emptyList<Any>() // Return ค่าว่างแทนที่จะ throw
+                    // ★ device evidence (com.aether_1.zip 00:28:30 PID15854):
+                    //   IShortcutService.getShortcuts ประกาศ return = ParceledListSlice —
+                    //   คืน emptyList → CCE "EmptyList to ParceledListSlice" ที่
+                    //   $Proxy12.getShortcuts → FATAL บน initialize-shortcuts
+                    return emptyParceledListSlice()
                 }
                 
                 // Override package name ถ้ามี
@@ -569,11 +585,25 @@ object ServiceBinderProxy {
                 // SNAKE ob.invoke fallback = method.invoke(realIface, args) — delegate
                 // ตรงไปยัง IInterface ตัวจริง (ไม่ต้องแปลงเป็น binder/transact เอง)
                 method.invoke(realIface, *(modifiedArgs ?: emptyArray()))
+            } catch (e: java.lang.reflect.InvocationTargetException) {
+                // แบบเดียวกับ handlePackageCall: ให้ caller เห็น cause จริง
+                Log.w(TAG, "Shortcut proxy rethrow ${method.name}: " +
+                    "${e.cause?.javaClass?.simpleName}: ${e.cause?.message}")
+                throw (e.cause as? Exception) ?: Exception(e)
             } catch (e: Exception) {
-                Log.w(TAG, "Shortcut proxy call failed: ${e.message}")
-                emptyList<Any>() // ปลอดภัย: คืนค่าว่างเสมอ
+                Log.w(TAG, "Shortcut proxy call failed ${method.name}: " +
+                    "${e.javaClass.simpleName}: ${e.message}")
+                emptyParceledListSlice() // ปลอดภัย: คืน empty ผลลัพธ์ที่ถูกประเภทเสมอ
             }
         }
+
+        /** ผลว่างที่ type ตรงกับ AIDL return (ParceledListSlice) — fallback = emptyList
+         *  เฉพาะกรณี reflection fail (device เก่าที่ class ย้าย package) */
+        private fun emptyParceledListSlice(): Any = runCatching {
+            Class.forName("android.content.pm.ParceledListSlice")
+                .getConstructor(List::class.java)
+                .newInstance(emptyList<Any>())
+        }.getOrElse { emptyList<Any>() }
 
         private fun handleUsageStatsCall(method: Method, args: Array<out Any>?): Any? {
             return try {
