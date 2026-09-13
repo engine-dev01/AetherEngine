@@ -12,7 +12,7 @@ import android.util.Log
  * ProxyContentProvider — Multi-process IPC Gateway (Aether-compatible)
  *
  * Routes encrypted IPC messages through process pool (:p0-:p3) to
- * AetherSystemCallProvider (:daemon). Each instance handles its own
+ * AetherSystemCallProvider (:engine). Each instance handles its own
  * process pool's IPC workload.
  *
  * Protocol:
@@ -176,7 +176,10 @@ object AetherIpcBridge {
     }
 
     fun detach() {
-        // Clear cached state in native layer
+        // Clear cached state in native layer.
+        // หมายเหตุ: ไม่ใช่ hop ของ snake (flagger na/nb = 0 callers ตาม T1 F2) —
+        // คงไว้เป็น session hygiene ฝั่ง Aether เท่านั้น; hop ของ Native.i คือ
+        // nativeSetSeed(SDK_INT) ใน GuestRuntime.bindToActivityThread (T2 hop21)
         try {
             com.aether.Engine.nativeSetSeed(0) // reset seed = clear session
         } catch (_: Exception) {}

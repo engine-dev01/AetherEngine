@@ -212,13 +212,13 @@
             android:exported="true"
             android:process=":p3" />
 
-        <!-- SystemCallProvider (IPC gateway) — :daemon process -->
+        <!-- SystemCallProvider (IPC gateway) — :engine process -->
         <provider
             android:name="com.aether.engine.ipc.AetherSystemCallProvider"
             android:authorities="com.aether.engine.ipc.SystemCallProvider"
             android:exported="true"
             android:permission="com.aether.engine.permission.IPC_ACCESS"
-            android:process=":daemon"/>
+            android:process=":engine"/>
 
         <!-- AetherFileProvider (Aether-compatible: FileProvider) -->
         <provider
@@ -231,24 +231,24 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Daemon Foreground Service (:daemon) -->
+        <!-- Daemon Foreground Service (:engine) -->
         <service
             android:name="com.aether.engine.daemon.AetherDaemonService"
             android:exported="false"
             android:foregroundServiceType="dataSync"
-            android:process=":daemon"/>
+            android:process=":engine"/>
 
         <service
             android:name="com.aether.engine.daemon.AetherDaemonInnerService"
             android:exported="false"
-            android:process=":daemon"/>
+            android:process=":engine"/>
 
-        <!-- VPN Service (:daemon) — moved from :vpn to :daemon per blueprint parity -->
+        <!-- VPN Service (:engine) — moved from :vpn to :engine per blueprint parity -->
         <service
             android:name="com.aether.engine.vpn.AetherVpnService"
             android:permission="android.permission.BIND_VPN_SERVICE"
             android:exported="true"
-            android:process=":daemon"/>
+            android:process=":engine"/>
 
         <!-- Stub Broadcast Receiver — guarded by signature permission -->
         <receiver

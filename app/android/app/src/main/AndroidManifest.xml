@@ -56,33 +56,33 @@
         <!-- Flutter embedding v2 -->
         <meta-data android:name="flutterEmbedding" android:value="2" />
 
- <!-- ─── :daemon PROCESS (เทียบเท่า :engine ของ the reference engine) ─── -->
-        <!-- SystemCallProvider (IPC gateway) — :daemon process -->
+ <!-- ─── :engine PROCESS (เทียบเท่า :engine ของ the reference engine) ─── -->
+        <!-- SystemCallProvider (IPC gateway) — :engine process -->
         <provider
             android:name="com.aether.engine.ipc.AetherSystemCallProvider"
             android:authorities="com.aether.engine.ipc.SystemCallProvider"
             android:exported="true"
             android:permission="com.aether.engine.permission.IPC_ACCESS"
-            android:process=":daemon"/>
+            android:process=":engine"/>
 
-        <!-- Daemon Foreground Service (:daemon) -->
+        <!-- Daemon Foreground Service (:engine) -->
         <service
             android:name="com.aether.engine.daemon.AetherDaemonService"
             android:exported="false"
             android:foregroundServiceType="dataSync"
-            android:process=":daemon"/>
+            android:process=":engine"/>
 
         <service
             android:name="com.aether.engine.daemon.AetherDaemonInnerService"
             android:exported="false"
-            android:process=":daemon"/>
+            android:process=":engine"/>
 
-        <!-- VPN Service (:daemon) -->
+        <!-- VPN Service (:engine) -->
         <service
             android:name="com.aether.engine.vpn.AetherVpnService"
             android:permission="android.permission.BIND_VPN_SERVICE"
             android:exported="true"
-            android:process=":daemon"/>
+            android:process=":engine"/>
 
         <!-- ─── :p0–:p3 PROXY PROCESSES ─── -->
         <!-- Multi-Process Proxy Activities (:p0–:p3) -->

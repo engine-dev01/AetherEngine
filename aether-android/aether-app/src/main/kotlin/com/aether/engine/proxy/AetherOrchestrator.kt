@@ -85,7 +85,7 @@ object AetherOrchestrator {
             // 4. Initialize SandboxManager + provision helpers
             SandboxManager.init(context)
             try {
-                val payloadDir = java.io.File(context.dataDir, "vision/files")
+                val payloadDir = java.io.File(context.dataDir, "root/files")
                 SandboxManager.provisionPayloadsFromFiles(payloadDir)
                 SandboxManager.provisionVdexStubs()
             } catch (_: Exception) {}
@@ -485,7 +485,7 @@ object AetherOrchestrator {
             VirtualAppContainer.setup()
             Log.d(TAG, "launchInSandbox: VirtualAppContainer ready for $targetPkg")
 
-            // 2. Bootstrap + mount sandbox (bind-mount root/data เกมจริง -> vision/)
+            // 2. Bootstrap + mount sandbox (bind-mount root/data เกมจริง -> root/)
             SandboxManager.bootstrapGameData(targetPkg)
             SandboxManager.mountSandbox(targetPkg)
             Log.d(TAG, "launchInSandbox: sandbox mounted for $targetPkg")
@@ -502,7 +502,7 @@ object AetherOrchestrator {
             //    runs in the proxy process for exactly this isolation).
             // 4a. ★ ขั้น ② (a7.w/u:292 + a7.m:171 parity) — จอง slot + provider
             //     handshake: ContentResolver.call(content://com.aether.proxy.content.N,
-            //     "_Aether_|_init_process_", cfg) → Android spawn :pN เอง (framework
+            //     "_Engine_|_init_process_", cfg) → Android spawn :pN เอง (framework
             //     ติดตั้ง provider ตาม manifest process=) → child ตอบ IBinder กลับ
             //     → linkToDeath คุมชีพ + config ถึง child ก่อน activity dispatch
             val slot = GuestProcessTable.allocate(context, targetPkg)
@@ -527,7 +527,9 @@ object AetherOrchestrator {
             )
             proxy.putExtra("target_package", targetPkg)
             proxy.putExtra("target_sandbox", SandboxManager.getSandboxRoot()?.absolutePath)
-            if (handshook) proxy.putExtra("guest_slot", slot)
+            // key ≡ GuestProcessTable.EXTRA_SLOT (single source — ห้าม literal ซ้ำ)
+            // หมายเหตุ snake-parity: il0 แพ็ค real intent (_S_|_target_ ฯลฯ) = งาน P4
+            if (handshook) proxy.putExtra(GuestProcessTable.EXTRA_SLOT, slot)
             proxy.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(proxy)
             val label = if (handshook) "P$slot" else "P0(fallback)"

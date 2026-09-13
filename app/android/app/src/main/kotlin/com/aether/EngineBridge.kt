@@ -397,23 +397,25 @@ object EngineBridge : MethodCallHandler {
     }
 
     /**
-     * handshakeStatus — จำลอง a7.m() provider call จริง (method "_Aether_|_init_process_")
+     * handshakeStatus — จำลอง a7.m() provider call จริง (method "_Engine_|_init_process_")
      * ผ่าน provider ฝั่งเดียวกัน (P0 ทำงานใน :p0 → call ข้าม process จริง)
      * ใช้กดจาก UI เพื่อตรวจ child ตอบ config + IBinder กลับไหม โดยไม่ต้อง launch เกม
      */
     private fun handshakeStatus(): String {
         val c = ctx ?: return "✗ no context"
         return try {
-            val uri = android.net.Uri.parse("content://com.aether.proxy.content.0")
-            val extras = android.os.Bundle().apply {
-                putString("guest_pkg", "com.aether.test.chaincheck")
-                putInt("slot", 0)
-                putInt("user_id", android.os.Process.myUid() / 100000)
-            }
+            // endpoint เดียวกับ spawner จริง (GuestProcessTable) — ใช้ helper + key
+            // ชุดเดียวกัน ห้าม hardcode ซ้ำ (บทเรียน schema ไม่ตรงกันทั้งระบบ)
+            val uri = android.net.Uri.parse(
+                com.aether.engine.proxy.GuestProcessTable.providerAuthority(0))
+            val extras = com.aether.engine.proxy.GuestProcessTable.configToBundle(
+                com.aether.engine.proxy.ClientConfig(
+                    "com.aether.test.chaincheck", 0, android.os.Process.myUid() / 100000))
             val reply = c.contentResolver.call(uri,
                 com.aether.engine.proxy.GuestProcessTable.METHOD_INIT, null, extras)
             if (reply == null) "✗ reply=null"
-            else "success=${reply.getBoolean("success")} err=${reply.getString("error")} " +
+            else "success=${reply.getBoolean(com.aether.engine.proxy.GuestProcessTable.EXTRA_SUCCESS)} " +
+                "err=${reply.getString(com.aether.engine.proxy.GuestProcessTable.EXTRA_ERROR)} " +
                 "clientBinder=${reply.getBinder(com.aether.engine.proxy.GuestProcessTable.BUNDLE_CLIENT) != null}"
         } catch (e: Throwable) {
             "✗ ${e.javaClass.simpleName}: ${e.message}"

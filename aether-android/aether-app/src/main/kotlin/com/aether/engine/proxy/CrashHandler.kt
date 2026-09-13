@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * 8. Locale & Time (locale, TZ, uptime, boot time)
  * 9. System Services (active procs, services count)
  * 10. Engine Stats (AetherOrchestrator state)
- * 11. Sandbox State (vision/ tree, package.conf, pgl, vdex)
+ * 11. Sandbox State (root/ tree, package.conf, pgl, vdex)
  * 12. Permissions (granted)
  * 13. Installed Apps (count + sample)
  * 14. Exception (stack + cause chain + thread dump)
@@ -275,7 +275,7 @@ object CrashHandler {
         // ═══ Section 11: Sandbox State ═══
         sb.appendLine("═══ [11] SANDBOX STATE ═══")
         try {
-            val visionDir = SandboxManager.getSandboxRoot() ?: File(ctx?.dataDir, "vision")
+            val visionDir = SandboxManager.getSandboxRoot() ?: File(ctx?.dataDir, "root")
             if (visionDir.exists()) {
                 val allFiles = visionDir.walkTopDown().filter { it.isFile }.toList()
                 // sandbox now holds the TARGET (guest) tree, keyed by target pkg.
@@ -283,7 +283,7 @@ object CrashHandler {
                 val packageConf = File(visionDir, "data/app/$target/package.conf")
                 val pglDir = File(visionDir, "data/user/0/$target/a0rjgdfbjd8fhfglkew6")
                 val oatDir = File(visionDir, "oat/arm64")
-                sb.appendLine("vision/ root: ${visionDir.absolutePath}")
+                sb.appendLine("root/ root: ${visionDir.absolutePath}")
                 sb.appendLine("Total files: ${allFiles.size}")
                 sb.appendLine("package.conf: ${if (packageConf.exists()) "exists (${packageConf.length()}B)" else "missing"}")
                 sb.appendLine("PGL libs: ${if (pglDir.exists()) {
@@ -294,7 +294,7 @@ object CrashHandler {
                     oatDir.listFiles()?.size ?: 0
                 } else 0} files in oat/arm64/")
             } else {
-                sb.appendLine("vision/ NOT created (sandbox not bootstrapped yet)")
+                sb.appendLine("root/ NOT created (sandbox not bootstrapped yet)")
             }
         } catch (e: Exception) { sb.appendLine("Sandbox state error: ${e.message}") }
         sb.appendLine()

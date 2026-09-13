@@ -34,11 +34,29 @@ object GuestProcessTable {
     private const val TAG = "AetherGuestTable"
 
     /** ชื่อ method/keys — mirror SNAKE "_Engine_|_init_process_" / "_Engine_|_client_" */
-    const val METHOD_INIT = "_Aether_|_init_process_"
-    const val BUNDLE_CLIENT = "_Aether_|_client_"
+    const val METHOD_INIT = "_Engine_|_init_process_"
+    const val BUNDLE_CLIENT = "_Engine_|_client_"
 
     /** manifest ประกาศ ProxyContentProvider$P0..P3 (authorities content://com.aether.proxy.content.N) */
     const val MAX_SLOTS = 4
+
+    /** keys ของ request bundle — endpoint สองฝั่งเป็นโค้ดเรา (blueprint B4: ธีม snake `_S_|_*`)
+     *  ผู้เขียน = configToBundle() · ผู้อ่าน = GuestProcessHolder.handleInit() — ชุดเดียวตรงกัน */
+    const val EXTRA_GUEST_PKG = "_S_|_guest_pkg_"
+    const val EXTRA_SLOT      = "_S_|_slot_"
+    const val EXTRA_USER_ID   = "_S_|_user_id_"
+    const val EXTRA_SUCCESS   = "_S_|_success_"
+    const val EXTRA_ERROR     = "_S_|_error_"
+
+    /** authority per-slot (P2 จะเทียบ snake `proxy_content_provider_<n>` — ตอนนี้คงเดิมทั้ง 2 ฝั่ง) */
+    fun providerAuthority(slot: Int): String = "content://com.aether.proxy.content.$slot"
+
+    /** ClientConfig → request Bundle (คีย์ ≡ ที่ handleInit อ่าน — ห้ามต่างกัน) */
+    fun configToBundle(cfg: ClientConfig): Bundle = Bundle().apply {
+        putString(EXTRA_GUEST_PKG, cfg.guestPkg)
+        putInt(EXTRA_SLOT, cfg.slot)
+        putInt(EXTRA_USER_ID, cfg.userId)
+    }
 
     // ─── server-side state (process ที่เรียก launchInSandbox) ───
     private val slotOf = HashMap<String, Int>()          // guestPkg → slot (a7 map)
@@ -82,29 +100,27 @@ object GuestProcessTable {
      * a7.m() parity — provider handshake:
      *   1. ContentResolver.call(content://com.aether.proxy.content.<slot>, METHOD_INIT, cfg)
      *      → ถ้า :pN ยังไม่เกิด Android spawn ให้เอง (จุดเริ่ม process ที่ framework thật)
-     *   2. reply "_Aether_|_client_" = IBinder ของ child → linkToDeath:
+     *   2. reply "_Engine_|_client_" = IBinder ของ child → linkToDeath:
      *      guest ตาย → ปล่อย slot อัตโนมัติ (SNAKE a7.java:601 DeathRecipient)
      * คืน false ถ้า handshake ไม่สำเร็จ → caller ยัง launch ด้วย intent-extras
      * แบบเดิมได้ (fallback ไม่ให้พังกว่าเดิม — พิสูจน์แล้วว่า reach onResume)
      */
     fun spawnAndConfig(ctx: Context, cfg: ClientConfig): Boolean {
-        val uri = android.net.Uri.parse("content://com.aether.proxy.content.${cfg.slot}")
-        val extras = Bundle().apply {
-            putString("guest_pkg", cfg.guestPkg)
-            putInt("slot", cfg.slot)
-            putInt("user_id", cfg.userId)
-        }
+        val uri = android.net.Uri.parse(providerAuthority(cfg.slot))
+        val extras = configToBundle(cfg)
         val reply = try {
             ctx.contentResolver.call(uri, METHOD_INIT, null, extras)
         } catch (e: Throwable) {
             Log.w(TAG, "handshake call slot=${cfg.slot} failed: ${e.message}")
             null
         }
-        if (reply?.getBoolean("success") != true) {
-            Log.w(TAG, "slot ${cfg.slot} refused: ${reply?.getString("error") ?: "no reply"}")
+        // snake ProxyContentProvider.java:21-23: reply = putParcelable(_Engine_|_client_)
+        // ตัวเดียว — absence ของ binder = refused (ไม่มี success/error flag)
+        val client = reply?.getBinder(BUNDLE_CLIENT)
+        if (client == null) {
+            Log.w(TAG, "slot ${cfg.slot} refused (no ${BUNDLE_CLIENT} in reply)")
             return false
         }
-        val client = reply.getBinder(BUNDLE_CLIENT) ?: return false
         synchronized(this) {
             try {
                 deathOf[cfg.slot]?.let { old -> clientOf[cfg.slot]?.unlinkToDeath(old, 0) }
@@ -156,23 +172,27 @@ object GuestProcessHolder {
 
     /** ตอบ ProxyContentProvider.call(METHOD_INIT) — semantics เท่า jv0.P2:285 */
     fun handleInit(extras: Bundle?): Bundle {
-        val pkg = extras?.getString("guest_pkg")
-        val slot = extras?.getInt("slot", -1) ?: -1
+        val pkg = extras?.getString(GuestProcessTable.EXTRA_GUEST_PKG)
+        val slot = extras?.getInt(GuestProcessTable.EXTRA_SLOT, -1) ?: -1
         if (pkg.isNullOrEmpty() || slot < 0) {
-            return Bundle().apply { putBoolean("success", false); putString("error", "bad config") }
+            return Bundle().apply {
+                putBoolean(GuestProcessTable.EXTRA_SUCCESS, false)
+                putString(GuestProcessTable.EXTRA_ERROR, "bad config")
+            }
         }
         val cur = config
         if (cur != null && cur.guestPkg != pkg) {
             // jv0.P2: "Reject init process: X, this process is: Y"
             Log.e(TAG, "Reject init: $pkg — process bound to ${cur.guestPkg} (slot ${cur.slot})")
             return Bundle().apply {
-                putBoolean("success", false); putString("error", "reject:${cur.guestPkg}")
+                putBoolean(GuestProcessTable.EXTRA_SUCCESS, false)
+                putString(GuestProcessTable.EXTRA_ERROR, "reject:${cur.guestPkg}")
             }
         }
-        config = ClientConfig(pkg, slot, extras.getInt("user_id", 0))
+        config = ClientConfig(pkg, slot, extras.getInt(GuestProcessTable.EXTRA_USER_ID, 0))
         Log.i(TAG, "p3 accepted: $pkg → slot $slot (SNAKE jv0.P2 parity)")
         return Bundle().apply {
-            putBoolean("success", true)
+            putBoolean(GuestProcessTable.EXTRA_SUCCESS, true)
             putBinder(GuestProcessTable.BUNDLE_CLIENT, clientBinder)
         }
     }

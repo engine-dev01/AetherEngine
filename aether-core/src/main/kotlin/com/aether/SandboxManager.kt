@@ -13,11 +13,12 @@ import java.security.SecureRandom
 /**
  * Mirror Sandbox — Aether-aligned virtual data storage.
  *
- * เส้นทาง sandbox root: /data/user/0/com.aether/vision/
- * (ย้ายออกจาก files/ มาไว้ที่ dataDir root ตรง — /data/user/0/com.aether/vision)
+ * เส้นทาง sandbox root: /data/user/0/com.aether/root/
+ * (dataDir root ตรง — ชื่อ "root" ≡ blueprint L0; snake ใช้ getExternalFilesDir("root")
+ *  lv0.java:72 — เส้นทางเต็มเทียบตอน P2)
  *
  * โครงสร้าง (ตาม blueprint จาก data dump analysis):
- *   vision/
+ *   root/
  *   ├── data/app/<pkg>/                    ← package.conf (manifest snapshot)
  *   ├── data/user/0/<pkg>/
  *   │   ├── a0rjgdfbjd8fhfglkew6/<ver>/arm64-v8a/  ← PGL modules
@@ -36,7 +37,7 @@ object SandboxManager {
     private var sandboxRoot: File? = null
     // Phase 1+2: in-process only. targetPkg is now the engine's own
     // package (com.aether), not an external game. We keep the bootstrap
-    // path (vision/data/user/0/...) because VirtualFS uses it, but
+    // path (root/data/user/0/...) because VirtualFS uses it, but
     // no external package is read/written.
     private var targetPkg = "com.aether"
     private var targetUid: Int = -1
@@ -126,9 +127,9 @@ object SandboxManager {
 
     fun init(context: Context) {
         appContext = context.applicationContext
-        // sandbox root ย้ายออกจาก files/ → dataDir root ตรง:
-        //   /data/user/0/com.aether/vision   (ไม่ใช่ .../files/vision)
-        sandboxRoot = File(context.dataDir, "vision")
+        // sandbox root อยู่ที่ dataDir root ตรง:
+        //   /data/user/0/com.aether/root   (ไม่ใช่ .../files/root)
+        sandboxRoot = File(context.dataDir, "root")
         sandboxRoot?.mkdirs()
         // [CUT 2026-09-11] spoofRootEnvironment — resetprop/magiskpolicy
         // (ปลอม env root/debuggable/secure) ทำให้แอพกั๊กตัวเอง งดก่อนทดสอบ

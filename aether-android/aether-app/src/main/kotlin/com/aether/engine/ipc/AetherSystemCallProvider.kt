@@ -17,10 +17,10 @@ class AetherSystemCallProvider : ContentProvider() {
 
         // IPC constants (inlined — single source of truth lives here)
         private const val SIGNATURE_PERMISSION = "com.aether.engine.permission.IPC_ACCESS"
-        private const val PROVIDER_METHOD_VM   = "vm"
-        private const val EXTRA_SUCCESS        = "success"
-        private const val EXTRA_SERVER_NAME    = "server_name"
-        private const val EXTRA_SERVER_BINDER  = "server_binder"
+        private const val PROVIDER_METHOD_VM   = "VM"
+        private const val EXTRA_SUCCESS        = "_S_|_success_"
+        private const val EXTRA_SERVER_NAME    = "_S_|_server_name_"
+        private const val EXTRA_SERVER_BINDER  = "_S_|_server_"
 
         /** Binder instance เดียวของ daemon (Messenger) — lazy init เพื่อ stability */
         @Volatile private var daemonBinder: IBinder? = null

@@ -23,23 +23,23 @@ class AetherDaemonService : Service() {
         super.onCreate()
         createNotificationChannel()
         startForegroundSafe()
-        // Phase 1+2: load libaether.so + init orchestrator in THIS process (:daemon).
+        // Phase 1+2: load libaether.so + init orchestrator in THIS process (:engine).
         // EngineLoader already loads libaether.so in the main process, but the daemon
-        // runs in a SEPARATE process (:daemon) which has its own /proc/self/maps.
+        // runs in a SEPARATE process (:engine) which has its own /proc/self/maps.
         // Without this, nativeFindModuleBase(ownPID, "libaether.so") returns 0 because
-        // libaether.so is not mapped in :daemon → attach fails silently.
+        // libaether.so is not mapped in :engine → attach fails silently.
         try {
             if (!isLibAetherLoaded()) {
                 System.loadLibrary("aether")
-                Log.i(TAG, "libaether.so loaded in :daemon process (PID=${android.os.Process.myPid()})")
+                Log.i(TAG, "libaether.so loaded in :engine process (PID=${android.os.Process.myPid()})")
             }
         } catch (e: UnsatisfiedLinkError) {
-            Log.e(TAG, "Failed to load libaether.so in :daemon: ${e.message}")
+            Log.e(TAG, "Failed to load libaether.so in :engine: ${e.message}")
         }
         try {
             com.aether.engine.proxy.AetherOrchestrator.init(applicationContext)
         } catch (t: Throwable) {
-            Log.e(TAG, "AetherOrchestrator.init in :daemon failed: ${t.message}")
+            Log.e(TAG, "AetherOrchestrator.init in :engine failed: ${t.message}")
         }
         // เริ่ม Inner worker แบบ plain Service (ไม่ใช่ FGS — parent เป็น FGS อยู่แล้ว)
         // ห้ามใช้ startForegroundService เพราะ inner ไม่ call startForeground() → crash

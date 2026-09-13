@@ -335,7 +335,7 @@ object VirtualAppContainer {
 
         // 1. Data directory redirects
         // When a real target is set (fake != real), redirect the target's
-        // data paths INTO the engine sandbox (vision/data/user/0/<target>) so
+        // data paths INTO the engine sandbox (root/data/user/0/<target>) so
         // the guest reads sandbox data, not its own real install. When fake ==
         // real (self/host mode) fall back to the host's own dataDir.
         val hostDataDir = context.dataDir?.absolutePath ?: "/data/data/$realPackageName"

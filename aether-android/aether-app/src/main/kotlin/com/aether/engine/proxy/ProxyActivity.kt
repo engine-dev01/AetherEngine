@@ -41,8 +41,8 @@ open class ProxyActivity : Activity() {
         val isVirtual = targetPkg.isNotEmpty() && targetPkg != "com.aether"
 
         // VirtualFS data isolation: the guest must read/write its OWN sandboxed
-        // data (vision/data/user/0/<pkg>) — NOT the real installed app's data
-        // dir. target_sandbox = virtual root (vision/); package dir derived.
+        // data (root/data/user/0/<pkg>) — NOT the real installed app's data
+        // dir. target_sandbox = virtual root (root/); package dir derived.
         val guestDataDir = intent.getStringExtra("target_sandbox")
             ?.let { root -> File(root, "data/user/0/$targetPkg") }
 
@@ -59,7 +59,7 @@ open class ProxyActivity : Activity() {
         //    (ก่อนถึงตรงนี้) → log ยืนยัน; ยังไม่มี (fallback path) → seed จาก intent
         GuestProcessHolder.config
             ?.also { DiagLog.d("ProxyActivity", "p3 via handshake: slot=${it.slot} pkg=${it.guestPkg}") }
-            ?: intent.getIntExtra("guest_slot", -1).let { s ->
+            ?: intent.getIntExtra(GuestProcessTable.EXTRA_SLOT, -1).let { s ->
                 if (s >= 0) GuestProcessHolder.seed(targetPkg, s)
             }
 

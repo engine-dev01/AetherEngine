@@ -338,7 +338,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // ─── "1234" test key — จำลองปุ่มเริ่มเกม: ตรวจ call stack ทีละ hop ───
   // ปุ่ม Play จริง: isTargetInstalled → launchInSandbox → Orchestrator →
   // VirtualAppContainer → ServiceBinderProxy(sCache) → GuestProcessTable →
-  // ProxyContentProvider.call("_Aether_|_init_process_") → child holder
+  // ProxyContentProvider.call("_Engine_|_init_process_") → child holder
   // คีย์ 1234 เรียก chainCheck(hop 1-6 ในเครื่อง) + handshakeStatus (provider call
   // จริงข้าม :p0) แล้วแสดงผลเป็นข้อความ — ไม่ต้อง launch เกมก็เห็นสอดคล้องกัน
   Future<void> _chainCheck1234() async {
