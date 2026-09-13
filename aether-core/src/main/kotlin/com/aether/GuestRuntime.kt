@@ -87,6 +87,10 @@ class GuestRuntime private constructor(
             Log.e(TAG, "bindToActivityThread REFUSED: guest Application has no base context")
             return false
         }
+        // Spoof BEFORE the binds below — every SDK/provider init that follows
+        // (FirebaseInitProvider 05.963 in the aether-live snapshot) reads the
+        // framework process name; it must already say the guest main name.
+        spoofProcessName(at)
         var anyOk = false
         anyOk = bindInitialApplication(at) || anyOk
         anyOk = bindAllApplications(at) || anyOk
@@ -209,6 +213,65 @@ class GuestRuntime private constructor(
     // ───────────────────────────────────────────────────────────
     //  Private — 3-pass bind (เหนือกว่าต้นแบบ)
     // ───────────────────────────────────────────────────────────
+
+    /**
+     * Spoof the framework-reported process name of this proxy process to the
+     * guest's MAIN process name (targetPkg, no suffix).
+     *
+     * Evidence (aether-live snapshot vs SNAKE1, both 8BP):
+     *   - crashlytics folder (written by the GAME's bundled SDK, NOT by us):
+     *       SNAKE1 → .crashlytics.v3/com.miniclip.eightballpool/  (main name)
+     *       Aether → .crashlytics.v3/com.aether_p0/               (":p0" leaked)
+     *   - "com.aether:p0" means every SDK-visible identity (AMS isProcessNameOf
+     *     checks, ActivityThread.getProcessName(), Application.getProcessName())
+     *     still says host. GMS dynamite measurement keys its init threading on
+     *     this: SNAKE1/ninja only ever hit SecurityException on FA WORKER
+     *     threads (benign), ours landed on MAIN → Looper died → frozen screen.
+     *
+     * Touches ONLY our in-process ActivityThread fields (never game files).
+     * mProcessName is cached from the bindApplication transaction, so setting
+     * it here is the same value the real engine would have carried.
+     */
+    private fun spoofProcessName(at: Any) {
+        val name = targetPkg
+        if (name.isEmpty()) return
+        var applied = false
+        // 1. ActivityThread.mProcessName (private field through API 34).
+        if (setFieldIfPresent(at, "mProcessName", name)) applied = true
+        // 2. API 35+ moved the cache into ProcessNameProvider — guarded fallback
+        //    (device under test is Android 16: crash report os.version=16).
+        if (!applied) {
+            val providerField = findField(at.javaClass, "mProcessNameProvider")
+            if (providerField != null) {
+                try {
+                    providerField.isAccessible = true
+                    val provider = providerField.get(at)
+                    if (provider != null) {
+                        for (inner in arrayOf("mProcessName", "processName")) {
+                            if (setFieldIfPresent(provider, inner, name)) {
+                                applied = true
+                                break
+                            }
+                        }
+                    }
+                } catch (e: Throwable) {
+                    Log.w(TAG, "spoofProcessName: provider fallback failed: ${e.message}")
+                }
+            }
+        }
+        // 3. CompatibilityInfo changes when processName != packageName; the
+        //    framework caches it. Clear it so it recomputes as "main process".
+        val ciField = findField(at.javaClass, "mCompatibilityInfo")
+        if (ciField != null) {
+            try {
+                ciField.isAccessible = true
+                ciField.set(at, null)
+            } catch (e: Throwable) {
+                Log.w(TAG, "spoofProcessName: mCompatibilityInfo clear failed: ${e.message}")
+            }
+        }
+        Log.i(TAG, "spoofProcessName: $name (applied=$applied)")
+    }
 
     private fun bindInitialApplication(at: Any): Boolean {
         val r = guardedBool("bindInitialApplication") {
