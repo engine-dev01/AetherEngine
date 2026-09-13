@@ -134,8 +134,15 @@ open class ProxyActivity : Activity() {
                 // swapped back to the guest Activity inside :p0 — instead of AMS
                 // routing out to the real installed app.
                 if (res.success && res.guestClassLoader != null && !gm.launcher.isNullOrEmpty()) {
+                    // ★ device evidence 01:18:52.942: dispatch ย้ายเป็น P<slot> แล้ว
+                    // (8c51880) แต่ install ยัง hardcode P0 → newActivity swap
+                    // ตรวจ className==stubComponent fail → passthrough ตัว bootstrap
+                    // (ProxyActivity ไม่ใช่เกม) รัน onCreate ของเกม → ตาย → UI เด้ง
+                    // = regression ของตัวเอง; ใช้ component จริงของ instance นี้เสมอ
+                    val selfStub = component?.className
+                        ?: "com.aether.engine.proxy.ProxyActivity\$P0"
                     val hooked = AetherInstrumentation.install(
-                        stubComponent = "com.aether.engine.proxy.ProxyActivity\$P0",
+                        stubComponent = selfStub,
                         guestClassLoader = res.guestClassLoader,
                         guestApp = res.loadedApplication,
                     )
