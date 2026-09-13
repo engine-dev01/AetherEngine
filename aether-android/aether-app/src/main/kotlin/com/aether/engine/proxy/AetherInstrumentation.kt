@@ -295,6 +295,23 @@ class AetherInstrumentation(
     }
 
     /**
+     * hop23 ≡ SNAKE b8.callActivityOnResume → Native.ac(activity, Method)
+     * (T1 F2: Lcom/snake/helper/Native;->ac(Ljava/lang/Object;Ljava/lang/Object;)V
+     *  @ dex 0xed930 ใน b8 — T2 NATIVE_CALLSITE_MAP hop 23)
+     * ac→nativeProcessPair signature MATCH ตาม T1; snake แพ็ค Method ที่
+     * hidden-dex ประกาศ (pjowqpxe — รอ D6) ฝั่งเราจึงส่ง Method ที่หาได้
+     * (onResume ของ activity ตัวเอง) หรือ null เมื่อไม่มี — endpoint ของเรา
+     * เป็นโค้ดเราทั้งคู่ (B4) จึงเป็นกลางเชิง semantics และ never-crash.
+     */
+    override fun callActivityOnResume(activity: Activity) {
+        runCatching {
+            val m = runCatching { activity.javaClass.getDeclaredMethod("onResume") }.getOrNull()
+            com.aether.Engine.nativeProcessPair(activity, m)
+        }.onFailure { DiagLog.d(TAG, "ac hop (nativeProcessPair): ${it.message}") }
+        base.callActivityOnResume(activity)
+    }
+
+    /**
  * Re-root the guest's Resources at the GUEST's own arsc table.
  *
  * PROVEN root cause of rounds 5-7 (see 2026-09-11 RCA): the guest context

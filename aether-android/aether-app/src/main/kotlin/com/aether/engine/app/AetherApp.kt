@@ -15,6 +15,36 @@ import com.aether.engine.proxy.Flagger
 class AetherApp : Application() {
     companion object {
         private const val TAG = "AetherApp"
+
+        /**
+         * ชื่อ process ปัจจุบัน (≡ role ตาม snake yu0.f() — T2 hop17):
+         *   com.aether        → Main   → เรียก Native.ic
+         *   com.aether:pN     → Child  → เรียก Native.ic
+         *   com.aether:engine → Server → ไม่เรียก (snake: server ไม่มี ic call)
+         * 3 ทางอ่าน เพราะ hidden-API visibility ต่างกันตามเวอร์ชัน
+         */
+        fun currentProcessName(): String {
+            runCatching {
+                val m = Application::class.java.getDeclaredMethod("getProcessName")
+                (m.invoke(null) as? String)?.let { return it }
+            }
+            runCatching {
+                val at = Class.forName("android.app.ActivityThread")
+                val m = at.getDeclaredMethod("currentProcessName")
+                m.isAccessible = true
+                (m.invoke(null) as? String)?.let { return it }
+            }
+            return runCatching {
+                java.io.File("/proc/self/cmdline").readText().split('\u0000').first()
+            }.getOrDefault("")
+        }
+
+        /** role dispatch ตาม yu0.f: Main/Child เรียก ic, Server ไม่เรียก */
+        fun processRole(name: String): String = when {
+            name.endsWith(":engine") -> "server"
+            Regex(":[pP]\\d+$").containsMatchIn(name) -> "child"
+            else -> "main"
+        }
     }
 
     override fun onCreate() {
@@ -25,6 +55,23 @@ class AetherApp : Application() {
             EngineLoader.load(this)
         } catch (e: UnsatisfiedLinkError) {
             Log.e(TAG, "Failed to load native engine: ${e.message}")
+        }
+
+        // hop17 ≡ SNAKE Native.ic ที่ yu0.f() หลัง loadLibrary — Main+Child เท่านั้น
+        // (T1: F2 sig (Landroid/content/Context;)V · T2: server ไม่เรียก ic)
+        run {
+            val pname = currentProcessName()
+            val role = processRole(pname)
+            if (role == "main" || role == "child") {
+                try {
+                    com.aether.Engine.nativeInitContext(this)
+                    Log.i(TAG, "nativeInitContext (≡Native.ic) done role=$role proc=$pname")
+                } catch (t: Throwable) {
+                    Log.e(TAG, "nativeInitContext role=$role: ${t.message}")
+                }
+            } else {
+                Log.i(TAG, "nativeInitContext skipped — role=$role (snake parity: server ไม่เรียก ic)")
+            }
         }
 
         // Initialize core managers (each wrapped in Throwable — never let a
@@ -51,10 +98,10 @@ class AetherApp : Application() {
             Log.w(TAG, "RemoteConfig.fetchRemoteAsync: ${t.message}")
         }
 
-        // Phase 3.1: hydrate payload store จาก vision/files/ (DATA_DUMP §4 — 92 SHA-256 named)
+        // Phase 3.1: hydrate payload store จาก root/files/ (DATA_DUMP §4 — 92 SHA-256 named)
         // เดิม provisionPayloadsFromFiles count อย่างเดียว → เปลี่ยนเป็นเรียก native loadDir
         try {
-            val payloadDir = java.io.File(dataDir, "vision/files")
+            val payloadDir = java.io.File(dataDir, "root/files")
             val jklHex = "010100640100000000000000000100001400000000006464000000000100"  // DATA_DUMP §4.3
             val count = com.aether.Engine.nativeHydratePayloads(payloadDir.absolutePath, jklHex)
             Log.i(TAG, "nativeHydratePayloads: $count payloads loaded from ${filesDir.absolutePath}")
@@ -68,7 +115,7 @@ class AetherApp : Application() {
         // AetherOrchestrator: VirtualAppContainer + binder proxies + ART hooks
         // + native engine — ทุกขั้นมี try/catch ภายใน ไม่ทำ app ล่ม
         try { AetherOrchestrator.init(this) } catch (t: Throwable) { Log.e(TAG, "AetherOrchestrator.init: ${t.message}") }
-        // Daemon FG (:daemon process) — watchdog + keep-alive ตาม blueprint
+        // Daemon FG (:engine process) — watchdog + keep-alive ตาม blueprint
         try {
             ContextCompat.startForegroundService(
                 this, Intent(this, AetherDaemonService::class.java))

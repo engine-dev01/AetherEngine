@@ -52,6 +52,7 @@ echo "STEP1 OK (javac)"
     android/os/IBinder.kt \
     android/os/Bundle.kt \
     com/aether/engine/proxy/DiagLog.kt \
+    com/aether/Engine.kt \
     -d kotlin-out
 echo "STEP2 OK (kotlinc)"
 

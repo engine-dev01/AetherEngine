@@ -91,6 +91,10 @@ class GuestRuntime private constructor(
         // (FirebaseInitProvider 05.963 in the aether-live snapshot) reads the
         // framework process name; it must already say the guest main name.
         spoofProcessName(at)
+        // hop ≡ SNAKE Native.i(SDK_INT) ที่ jv0.O2:245 (F2 invoke @0x1b06d0) —
+        // native จุดเดียวใน bind path; seed = SDK_INT ของ host (T1 sig (I)V)
+        runCatching { com.aether.Engine.nativeSetSeed(android.os.Build.VERSION.SDK_INT) }
+            .onFailure { Log.w(TAG, "nativeSetSeed(SDK_INT) hop failed: ${it.message}") }
         var anyOk = false
         anyOk = bindInitialApplication(at) || anyOk
         anyOk = bindAllApplications(at) || anyOk
@@ -569,7 +573,7 @@ class GuestRuntime private constructor(
                     return false
                 }
                 val dataDir = sandboxRoot
-                // Device-protected (DE) equivalent: vision/data/user_de/0/<pkg>
+                // Device-protected (DE) equivalent: root/data/user_de/0/<pkg>
                 // (mirrors the real /data/user_de/0 split — SandboxManager creates it)
                 val deDataDir = sandboxRoot.parentFile?.parentFile?.parentFile
                     ?.let { File(it, "user_de/0/${sandboxRoot.name}") } ?: File(sandboxRoot, "de")

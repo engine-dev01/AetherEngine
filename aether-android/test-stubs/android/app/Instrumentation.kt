@@ -18,6 +18,8 @@ open class Instrumentation {
         savedInstanceState: Bundle?
     ) { /* no-op */ }
 
+    open fun callActivityOnResume(activity: Activity) { /* no-op */ }
+
     open fun execStartActivity(
         who: Context?,
         contextThread: IBinder?,
