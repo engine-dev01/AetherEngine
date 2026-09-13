@@ -517,10 +517,16 @@ object AetherOrchestrator {
                 Log.w(TAG, "launchInSandbox: no free slot (a7:317 semantics) → P0 fallback")
             }
 
-            // 4b. start activity stub บน slot ที่ handshake สำเร็จ (r1.k/kl0 parity:
+            // 4b. start activity stub บน slot ที่จองไว้ (r1.k/kl0 parity:
             //     stub component ต้องตรงกับ process suffix ของ provider ที่ปลุกขึ้น)
+            // ★ device test 00:31:21 (com.aether_1.zip): เดิม "else 0" dispatch เข้า
+            //   :p0 ที่ slot table จองให้ guest อื่นแล้ว (chaincheck ปินไว้) →
+            //   p3-first (≡ jv0.P2 semantics — ถูกแล้ว) override intent เกม
+            //   target กลายเป็น chaincheck, เกมไม่ถูกเปิด → stub ต้องตรงกับ slot
+            //   ที่ allocate เสมอ ไม่ handshook ก็ dispatch P<slot> (framework
+            //   spawn ผ่าน manifest process= อยู่แล้ว = พฤติกรรมก่อนมี handshake)
             val proxy = Intent()
-            val stubSuffix = if (handshook) slot else 0
+            val stubSuffix = if (slot >= 0) slot else 0
             proxy.setClassName(
                 context,
                 "com.aether.engine.proxy.ProxyActivity\$P$stubSuffix",
@@ -528,11 +534,12 @@ object AetherOrchestrator {
             proxy.putExtra("target_package", targetPkg)
             proxy.putExtra("target_sandbox", SandboxManager.getSandboxRoot()?.absolutePath)
             // key ≡ GuestProcessTable.EXTRA_SLOT (single source — ห้าม literal ซ้ำ)
+            // ส่งเสมอ: child ใช้ seed fallback ตอน handshake=false
             // หมายเหตุ snake-parity: il0 แพ็ค real intent (_S_|_target_ ฯลฯ) = งาน P4
-            if (handshook) proxy.putExtra(GuestProcessTable.EXTRA_SLOT, slot)
+            proxy.putExtra(GuestProcessTable.EXTRA_SLOT, stubSuffix)
             proxy.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(proxy)
-            val label = if (handshook) "P$slot" else "P0(fallback)"
+            val label = if (handshook) "P$stubSuffix" else "P$stubSuffix(no-handshake)"
             Log.i(TAG, "launchInSandbox: ProxyActivity.$label dispatched for " +
                 "$targetPkg (handshake=$handshook)")
             true
