@@ -56,7 +56,20 @@ object VirtualAppContainer {
      */
     fun init(context: Context, fakePkg: String = "") {
         if (isInitialized) {
-            Log.w(TAG, "Already initialized")
+            // Re-init with a REAL guest name (ProxyActivity in :pN) after the
+            // process-level Orchestrator wired us host-only: upgrade identity
+            // and rebuild the fake objects, otherwise fakePackageName stays
+            // "com.aether" → isVirtualTarget()=false → proxies install with the
+            // wrong overridePackage and setupVirtualFS/registerNativeRules skip.
+            if (fakePkg.isNotEmpty() && fakePkg != realPackageName && fakePackageName != fakePkg) {
+                fakePackageName = fakePkg
+                createFakeApplicationInfo()
+                createFakeApplication()
+                ServiceBinderProxy.setIdentity(context.packageName, fakePkg)
+                Log.i(TAG, "Re-init identity → fake=$fakePkg (guest mode upgrade)")
+            } else {
+                Log.w(TAG, "Already initialized")
+            }
             return
         }
 

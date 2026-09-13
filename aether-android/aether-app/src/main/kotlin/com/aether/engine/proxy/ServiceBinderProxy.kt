@@ -8,25 +8,23 @@ import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 
 /**
- * ServiceBinderProxy — 8-Service Binder Proxy (8 system services)
+ * ServiceBinderProxy — binder proxy layer แบบ SNAKE (bt0/j8/ob parity)
  *
- * สร้าง fake binder objects สำหรับระบบ services 8 ตัว:
- * 1. IActivityManager     — activity lifecycle control
- * 2. IPackageManager      — package query/modify
- * 3. IJobScheduler        — background job control
- * 4. IStorageManager      — storage/volume info
- * 5. IUserManager         — user profile info
- * 6. IAccountManager      — account/auth info
- * 7. ILocationManager     — location data
- * 8. INotificationManager — notification control
+ * กลไก (สกัดจริงจาก jadx — ดู workspace/NATIVE_CALLSITE_MAP.md §5):
+ *   1. realIface = IXxx$Stub.asInterface(ServiceManager.getService(key))
+ *      (= SNAKE ob.h(): d30.java:6 / b40.java:28 — delegate ตัวจริง ไม่ใช่ raw binder)
+ *   2. proxy = java.lang.reflect.Proxy(iInterfaceClass, handler)  (= ob.b():15)
+ *   3. wrapper = BinderWrapper(real, proxy) ใส่ ServiceManager.sCache[key]
+ *      (= j8.java:35-40 l(name) → bt0.b = sCache field, bt0.java:11)
+ *      → AOSP getService() เช็ค sCache ก่อน → ทุกผู้ใช้ใน process ได้ wrapper;
+ *        Stub.asInterface(wrapper) → queryLocalInterface → คืน proxy → เข้า handler
+ *   4. "activity": proxy还被ใส่ IActivityManagerSingleton.mInstance (= tz.i() →
+ *      uu0.m1.b/l1.b, tz.java:451) เพราะ ActivityManager ไม่อ่าน sCache
+ *   5. handler delegate = method.invoke(realIface, args) (= ob.invoke fallback)
  *
- * แต่ละ proxy:
- * - สร้าง via java.lang.reflect.Proxy (dynamic proxy)
- * - Intercepts method calls → delegate to real system service
- * - สามารถ override return values สำหรับ detection bypass
- * - Thread-safe (per-service singleton)
- *
- * ใช้คู่กับ VirtualFS.setupForApp() เพื่อ redirect package paths
+ * Services ที่ init() ติดตั้งจริง 11 ตัว (constants มี 40 — SNAKE 48):
+ * activity package jobscheduler mount user account location notification
+ * shortcut usagestats — ตรง 11 ตัวที่ guest 8BP/GMS เรียกใน crash trace
  */
 object ServiceBinderProxy {
 
@@ -108,11 +106,12 @@ object ServiceBinderProxy {
     fun init(context: android.content.Context, fakePkg: String = "") {
         overridePackage = fakePkg
         originalPackage = context.packageName
-
         try {
             val svcManager = getServiceManager()
 
-            // สร้าง proxy สำหรับแต่ละ service
+            // สร้าง proxy สำหรับแต่ละ service — KEY ที่ 3 = ชื่อจริงใน ServiceManager
+            // (ServiceFetcher constants — A16 ServiceManager.java:47+ / d30.l("isub")
+            //  pattern: sCache ถูก index ด้วยชื่อจริง ไม่ใช่ชื่อ "…_manager")
             createProxyForService(SERVICE_ACTIVITY, svcManager, "activity")
             createProxyForService(SERVICE_PACKAGE, svcManager, "package")
             createProxyForService(SERVICE_JOB, svcManager, "jobscheduler")
@@ -123,6 +122,7 @@ object ServiceBinderProxy {
             createProxyForService(SERVICE_NOTIFICATION, svcManager, "notification")
             createProxyForService(SERVICE_SHORTCUT, svcManager, "shortcut")
             createProxyForService(SERVICE_USAGE_STATS, svcManager, "usagestats")
+            createProxyForService(SERVICE_WINDOW, svcManager, "window")
 
             Log.i(TAG, "Initialized ${proxyCache.size} service proxies")
         } catch (e: Exception) {
@@ -131,11 +131,23 @@ object ServiceBinderProxy {
     }
 
     /**
+     * อัปเดต identity หลัง guest bind (VirtualAppContainer upgrade path) —
+     * proxies ถูก install แล้ว; handler อ่าน 2 ตัวแปรนี้ทุก call (visibility ตามปกติของ object singleton)
+     */
+    fun setIdentity(realPkg: String, guestPkg: String) {
+        originalPackage = realPkg
+        overridePackage = guestPkg
+        Log.i(TAG, "identity: real=$realPkg override=$guestPkg")
+    }
+
+    // ══════════════════════════════════════════
+    //  Proxy accessors
+    // ══════════════════════════════════════════
+
+    /**
      * ดึง proxy object สำหรับ service ที่ต้องการ
      */
-    fun getProxy(serviceName: String): Any? {
-        return proxyCache[serviceName]
-    }
+    fun getProxy(serviceName: String): Any? = proxyCache[serviceName]
 
     /**
      * ดึง real service object (ก่อน proxy)
@@ -160,9 +172,32 @@ object ServiceBinderProxy {
      * Clear all cached proxies (เรียกตอน engine shutdown)
      */
     fun shutdown() {
-        proxyCache.clear()
-        realServiceCache.clear()
-        Log.i(TAG, "Service proxies cleared")
+        // SNAKE ไม่ uninstall (process ตายพร้อม session) — แต่กัน :pN ที่ reuse
+        // container แล้ว shutdown: ถอด wrapper ของเราออกจาก sCache ก่อน
+        val cache = serviceManagerCache()
+        for ((name, proxy) in proxyCache.toList()) {
+            val key = sCacheKeyOf(name) ?: continue
+            if (cache?.get(key) is BinderWrapper) cache.remove(key)
+            proxyCache.remove(name)
+            realServiceCache.remove(name)
+        }
+        Log.i(TAG, "Service proxies cleared (sCache restored to real binders)")
+    }
+
+    /** name → ServiceManager key ที่ init() ใช้ install (ตรวจได้, 2 ทางเลือก) */
+    private fun sCacheKeyOf(name: String): String? = when (name) {
+        SERVICE_ACTIVITY -> "activity"
+        SERVICE_PACKAGE -> "package"
+        SERVICE_JOB -> "jobscheduler"
+        SERVICE_STORAGE -> "mount"
+        SERVICE_USER -> "user"
+        SERVICE_ACCOUNT -> "account"
+        SERVICE_LOCATION -> "location"
+        SERVICE_NOTIFICATION -> "notification"
+        SERVICE_SHORTCUT -> "shortcut"
+        SERVICE_USAGE_STATS -> "usagestats"
+        SERVICE_WINDOW -> "window"
+        else -> null
     }
 
     // ══════════════════════════════════════════
@@ -175,33 +210,207 @@ object ServiceBinderProxy {
      */
     private fun createProxyForService(serviceName: String, svcManager: Any, serviceNameKey: String) {
         try {
-            // ดึง real binder จาก ServiceManager
+            if (proxyCache.containsKey(serviceName)) {
+                Log.d(TAG, "Skip re-install: $serviceNameKey (already active)")
+                return
+            }
+            // ── ดึง real binder จาก ServiceManager ──
             val realBinder = getBinderFromServiceManager(svcManager, serviceNameKey)
             if (realBinder == null) {
                 Log.w(TAG, "Cannot find binder for service: $serviceNameKey")
                 return
             }
-
-            // ดึง IInterface class สำหรับ service นี้
+            // ── ดึง IInterface class สำหรับ service นี้ ──
             val iInterfaceClass = getIInterfaceClass(serviceNameKey)
             if (iInterfaceClass == null) {
                 Log.w(TAG, "Cannot find IInterface class for: $serviceNameKey")
                 return
             }
+            // ── realIface ผ่าน IXxx$Stub.asInterface(realBinder) ──
+            // SNAKE ob.b()/d30.java:6: h() = Stub.asInterface(bt0.c.b(name)) —
+            // delegate ต้องเป็น IInterface ตัวจริง (ไม่ใช่ raw IBinder ที่
+            // method.invoke จะพังเงียบแบบโค้ดเดิม)
+            val realIface = asInterfaceOf(iInterfaceClass, realBinder)
+            if (realIface == null) {
+                Log.w(TAG, "asInterface failed for: $serviceNameKey")
+                return
+            }
 
-            // สร้าง proxy object
+            // ── dynamic proxy (เฉพาะ interface — แบบ ob.java:15) ──
+            val handler = ServiceInvocationHandler(realIface, iInterfaceClass, serviceName)
             val proxy = Proxy.newProxyInstance(
                 iInterfaceClass.classLoader,
                 arrayOf(iInterfaceClass),
-                ServiceInvocationHandler(realBinder, iInterfaceClass, serviceName)
+                handler,
             )
+            val wrapper = BinderWrapper(realBinder, null, serviceNameKey)
+            wrapper.local = proxy            // j8.n ↔ handler (circular — set 2 จังหวะ)
+            handler.boundWrapper = wrapper   // j8: this-as-IBinder
 
             proxyCache[serviceName] = proxy
-            realServiceCache[serviceName] = realBinder
+            realServiceCache[serviceName] = realIface
 
-            Log.d(TAG, "Created proxy for $serviceName (${iInterfaceClass.simpleName})")
+            // ★ INSTALL — SNAKE j8.l(name) → bt0.b(sCache).put(name, this):
+            // AOSP ServiceManager.getService() เช็ค sCache ก่อนเสมอ → guest/SDK
+            // ทุกตัวใน process ได้ wrapper ตัวนี้แทน real binder;
+            // Stub.asInterface(wrapper) → wrapper.queryLocalInterface(DESCRIPTOR)
+            // คืน proxy เรา → ทุก call วิ่งเข้า handler (ไม่มีขั้นนี้ = ของตกแต่ง
+            // — บทเรียนจาก aether-live1/2 SecurityException ทั้งวง)
+            installIntoServiceManager(serviceNameKey, wrapper)
+
+            // AMS ไม่ได้อ่านผ่าน sCache บน Android 现代: ActivityManager.getService()
+            // = IActivityManagerSingleton.get() (cache mInstance) — SNAKE tz.i()
+            // แทนที่ singleton ผ่าน m1.b="IActivityManagerSingleton" (tz.java:451)
+            // → ทำเหมือนกัน: ยัด proxy ลง mInstance
+            // 2) static caches ที่ข้าม sCache โดยตรง (AOSP16 ตรวจแล้ว):
+            //    activity → ActivityManager.IActivityManagerSingleton.mInstance (tz.i)
+            //    package  → ActivityThread.sPackageManager (A16 AT:2954 — เช็ค static
+            //               ก่อน getService → ต้องทับ; = c20.i() t1.c.d(obj2))
+            //    window   → WindowManagerGlobal.sWindowManagerService (cache ครั้งเดียว)
+            when (serviceNameKey) {
+                "activity" -> replaceActivityManagerSingleton(proxy)
+                "package" -> patchPackageManagerCaches(proxy)
+                "window" -> clearWindowManagerGlobalCache()
+            }
+
+            Log.i(TAG, "Installed $serviceNameKey: sCache + handler (SNAKE j8/ob parity)")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to create proxy for $serviceName: ${e.message}")
+        }
+    }
+
+    // ══════════════════════════════════════════
+    //  SNAKE bt0/j8/ob equivalents — the install machinery
+    // ══════════════════════════════════════════
+
+    /** IXxx$Stub.asInterface(binder) — ทางเดียวกับ d30.java:6/ob.h() ใช้ */
+    private fun asInterfaceOf(iInterfaceClass: Class<*>, binder: IBinder): Any? {
+        return try {
+            val stub = Class.forName(iInterfaceClass.name + "$Stub")
+            stub.getMethod("asInterface", IBinder::class.java).invoke(null, binder)
+        } catch (e: Exception) {
+            Log.w(TAG, "asInterfaceOf ${iInterfaceClass.simpleName}: ${e.message}")
+            null
+        }
+    }
+
+    /** bt0.java:11 — handle ของ ServiceManager.sCache (ArrayMap<String,IBinder>) */
+    private fun serviceManagerCache(): MutableMap<String, IBinder>? {
+        return try {
+            val smClass = Class.forName("android.os.ServiceManager")
+            val f = smClass.getDeclaredField("sCache")
+            f.isAccessible = true
+            @Suppress("UNCHECKED_CAST")
+            f.get(null) as? MutableMap<String, IBinder>
+        } catch (e: Exception) {
+            Log.w(TAG, "sCache handle failed: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * BinderWrapper — เทียบ SNAKE j8 (j8.java:6 `extends ob implements IBinder`):
+     * วัตถุจริงที่ถูกใส่เข้า ServiceManager.sCache ภายใต้ key ของ service.
+     * AOSP ServiceManager.getService() เช็ค sCache ก่อน ping to servicemanager →
+     * ทุกผู้ใช้ใน process ได้ wrapper นี้; Stub.asInterface() เรียก
+     * queryLocalInterface(DESCRIPTOR) → คืน dynamic proxy ของเรา (j8.java:52
+     * ทำแบบเดียวกัน: return g()) → method calls วิ่งเข้า handler.
+     * transact() ยังคง forward ไป real binder (j8.java:61) เผื่อผู้ใช้ที่ถือ
+     * binder ตรง ๆ ไม่ผ่าน asInterface.
+     */
+    private class BinderWrapper(
+        private val real: IBinder,
+        var local: Any?,
+        private val key: String,
+    ) : IBinder {
+        override fun queryLocalInterface(descriptor: String): IInterface? = local as? IInterface
+        override fun transact(code: Int, data: android.os.Parcel, reply: android.os.Parcel?, flags: Int): Boolean =
+            real.transact(code, data, reply, flags)
+        override fun getInterfaceDescriptor(): String? = real.interfaceDescriptor
+        override fun pingBinder(): Boolean = real.pingBinder()
+        override fun isBinderAlive(): Boolean = real.isBinderAlive()
+        override fun linkToDeath(recipient: IBinder.DeathRecipient, flags: Int) = real.linkToDeath(recipient, flags)
+        override fun unlinkToDeath(recipient: IBinder.DeathRecipient, flags: Int) = real.unlinkToDeath(recipient, flags)
+        override fun dump(fd: java.io.FileDescriptor, prefix: Array<out String>?) = real.dump(fd, prefix)
+        override fun dumpAsync(fd: java.io.FileDescriptor, args: Array<out String>?) = real.dumpAsync(fd, args)
+    }
+
+    /**
+     * j8.l(name) → sCache.put(name, wrapper) — จุด install จริง (ตัวเดียวกับ
+     * ที่ Aether HEAD ขาด — สกัดจาก jadx: bt0.java:11 + j8.java:35-40)
+     */
+    private fun installIntoServiceManager(key: String, wrapper: BinderWrapper) {
+        val cache = serviceManagerCache()
+        if (cache == null) {
+            Log.w(TAG, "sCache unavailable — $key stays REAL binder (hidden-API?)")
+            return
+        }
+        try {
+            cache[key] = wrapper
+            Log.d(TAG, "sCache[$key] ← BinderWrapper")
+        } catch (e: Exception) {
+            Log.w(TAG, "sCache put $key failed: ${e.message}")
+        }
+    }
+
+    /**
+     * c20.i() parity (c20.java:344-346): `t1.c.d(obj2)` = เขียนทับ
+     * ActivityThread.sPackageManager ด้วย proxy — A16 GetIPackageManager()
+     * เช็ค static sPackageManager ก่อน (ActivityThread16.java:2954) ถ้าไม่ทับ
+     * "package" ใน sCache ก็ไร้ผล
+     */
+    private fun patchPackageManagerCaches(proxy: Any) {
+        try {
+            val atClass = Class.forName("android.app.ActivityThread")
+            val f = atClass.getDeclaredField("sPackageManager")
+            f.set(null, proxy)
+            Log.i(TAG, "ActivityThread.sPackageManager ← proxy (c20.t1.c parity)")
+        } catch (e: Exception) {
+            Log.w(TAG, "sPackageManager patch failed: ${e.message}")
+        }
+    }
+
+    /**
+     * ล้าง WindowManagerGlobal.sWindowManagerService ที่ cache real binder ไว้
+     * ครั้งเดียว — ให้มัน re-get ผ่าน sCache ของเรา (b40 "window")
+     */
+    private fun clearWindowManagerGlobalCache() {
+        try {
+            val clz = Class.forName("android.view.WindowManagerGlobal")
+            val f = clz.getDeclaredField("sWindowManagerService")
+            f.set(null, null)
+            Log.i(TAG, "WindowManagerGlobal.sWindowManagerService cleared → re-get via sCache")
+        } catch (e: Exception) {
+            Log.w(TAG, "WindowManagerGlobal cache clear failed: ${e.message}")
+        }
+    }
+
+    /**
+     * tz.i() equivalent — ActivityManager.IActivityManagerSingleton.mInstance ← proxy
+     * (android.util.Singleton.mInstance บน superclass ของ anonymous singleton;
+     * minSdk 28 → ใช้เส้นทาง API26+ นี้ทางเดียว ไม่แตะ gDefault เก่า)
+     */
+    private fun replaceActivityManagerSingleton(proxy: Any) {
+        try {
+            val am = Class.forName("android.app.ActivityManager")
+            val singletonField = am.getDeclaredField("IActivityManagerSingleton")
+            singletonField.isAccessible = true
+            val singleton = singletonField.get(null) ?: return
+            var c: Class<*>? = singleton.javaClass
+            while (c != null && c != Any::class.java) {
+                try {
+                    val mi = c.getDeclaredField("mInstance")
+                    mi.isAccessible = true
+                    mi.set(singleton, proxy)
+                    Log.i(TAG, "AMS singleton replaced (mInstance ← proxy @ ${c.simpleName})")
+                    return
+                } catch (_: NoSuchFieldException) {
+                    c = c.superclass
+                }
+            }
+            Log.w(TAG, "mInstance field not found on singleton chain")
+        } catch (e: Exception) {
+            Log.w(TAG, "AMS singleton replace failed: ${e.message}")
         }
     }
 
@@ -211,17 +420,41 @@ object ServiceBinderProxy {
 
     /**
      * InvocationHandler สำหรับ proxy method calls
-     * Intercepts → delegate to real binder → optionally override results
+     *
+     * SNAKE ob.java parity: delegate ทุก call ที่ไม่มี handler =
+     * `method.invoke(this.m, args)` เมื่อ m = realIface จาก
+     * IXxx$Stub.asInterface(realBinder) — ไม่ใช่ raw IBinder (โค้ดเดิมพยายาม
+     * invoke method ของ IInterface บน BinderProxy = พังเงียบ → SecurityException
+     * ไม่เคยถูก intercept จริง)
      */
     private class ServiceInvocationHandler(
-        private val realBinder: Any,
+        private val realIface: Any,
         private val iInterfaceClass: Class<*>,
-        private val serviceName: String
+        private val serviceName: String,
     ) : InvocationHandler {
+
+        /** j8.n ↔ BinderWrapper ใน sCache — ให้ asBinder() คืน object เดียวกับที่ system จะให้ */
+        @Volatile var boundWrapper: BinderWrapper? = null
 
         override fun invoke(proxy: Any, method: Method, args: Array<out Any>?): Any? {
             //  intercept special methods
             val methodName = method.name
+
+            // ── plumbing (Object/IInterface) — j8.java กัน method เดิมไม่ถูก invoke ──
+            when {
+                method.declaringClass == Any::class.java -> when (methodName) {
+                    "hashCode" -> return System.identityHashCode(proxy)
+                    "equals" -> return proxy === args?.getOrNull(0)
+                    else -> return proxy.toString()
+                }
+                methodName == "asBinder" -> {
+                    // IInterface.asBinder() → BinderWrapper ของเรา (object เดียวกับ sCache)
+                    // ผู้ใช้ที่ถือ binder ต่อ จะเจอ queryLocalInterface → คืน proxy → กลับเข้า handler
+                    return boundWrapper ?: try {
+                        realIface.javaClass.getMethod("asBinder").invoke(realIface)
+                    } catch (_: Exception) { null }
+                }
+            }
 
             // ── Package query interception ──
             if (serviceName == SERVICE_PACKAGE) {
@@ -243,18 +476,11 @@ object ServiceBinderProxy {
                 return handleUsageStatsCall(method, args)
             }
 
-            // ── Default: delegate to real binder ──
+            // ── Default: delegate to real IInterface (ob.invoke fallback) ──
             return try {
-                val asBinderMethod = realBinder.javaClass.getMethod("asBinder")
-                val binder = asBinderMethod.invoke(realBinder)
-
-                if (binder is IBinder) {
-                    // ใช้ transact ผ่าน Binder
-                    handleBinderTransact(binder, method, args)
-                } else {
-                    // Fallback: direct method invocation
-                    method.invoke(realBinder, *(args ?: emptyArray()))
-                }
+                method.invoke(realIface, *(args ?: emptyArray()))
+            } catch (e: java.lang.reflect.InvocationTargetException) {
+                throw e.cause ?: e   // cause เดิม → SDK เห็น exception ตรง ๆ เหมือนไม่มี proxy
             } catch (e: Exception) {
                 Log.w(TAG, "Proxy call failed for $serviceName.$methodName: ${e.message}")
                 null
@@ -285,11 +511,9 @@ object ServiceBinderProxy {
                     }
                 }?.toTypedArray()
 
-                val asBinderMethod = realBinder.javaClass.getMethod("asBinder")
-                val binder = asBinderMethod.invoke(realBinder) as? IBinder
-                    ?: return method.invoke(realBinder, *(modifiedArgs ?: emptyArray()))
-
-                handleBinderTransact(binder, method, modifiedArgs)
+                // SNAKE ob.invoke fallback = method.invoke(realIface, args) — delegate
+                // ตรงไปยัง IInterface ตัวจริง (ไม่ต้องแปลงเป็น binder/transact เอง)
+                method.invoke(realIface, *(modifiedArgs ?: emptyArray()))
             } catch (e: Exception) {
                 Log.w(TAG, "Package proxy call failed: ${e.message}")
                 null
@@ -321,11 +545,9 @@ object ServiceBinderProxy {
                     }
                 }?.toTypedArray()
 
-                val asBinderMethod = realBinder.javaClass.getMethod("asBinder")
-                val binder = asBinderMethod.invoke(realBinder) as? IBinder
-                    ?: return method.invoke(realBinder, *(modifiedArgs ?: emptyArray()))
-
-                handleBinderTransact(binder, method, modifiedArgs)
+                // SNAKE ob.invoke fallback = method.invoke(realIface, args) — delegate
+                // ตรงไปยัง IInterface ตัวจริง (ไม่ต้องแปลงเป็น binder/transact เอง)
+                method.invoke(realIface, *(modifiedArgs ?: emptyArray()))
             } catch (e: Exception) {
                 Log.w(TAG, "Shortcut proxy call failed: ${e.message}")
                 emptyList<Any>() // ปลอดภัย: คืนค่าว่างเสมอ
@@ -351,28 +573,15 @@ object ServiceBinderProxy {
                     }
                 }?.toTypedArray()
 
-                val asBinderMethod = realBinder.javaClass.getMethod("asBinder")
-                val binder = asBinderMethod.invoke(realBinder) as? IBinder
-                    ?: return method.invoke(realBinder, *(modifiedArgs ?: emptyArray()))
-
-                handleBinderTransact(binder, method, modifiedArgs)
+                // SNAKE ob.invoke fallback = method.invoke(realIface, args) — delegate
+                // ตรงไปยัง IInterface ตัวจริง (ไม่ต้องแปลงเป็น binder/transact เอง)
+                method.invoke(realIface, *(modifiedArgs ?: emptyArray()))
             } catch (e: Exception) {
                 Log.w(TAG, "Usage stats proxy call failed: ${e.message}")
                 null // ปลอดภัย: คืนค่า null เสมอ
             }
         }
 
-        private fun handleBinderTransact(binder: IBinder, method: Method, args: Array<out Any>?): Any? {
-            // สำหรับ IInterface ที่มี asBinder() method
-            // ใช้ transact() ผ่าน Binder interface
-            try {
-                // ลอง direct invocation ก่อน
-                return method.invoke(realBinder, *(args ?: emptyArray()))
-            } catch (e: Exception) {
-                Log.w(TAG, "Binder transact failed: ${e.message}")
-                return null
-            }
-        }
     }
 
     // ══════════════════════════════════════════
