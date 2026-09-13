@@ -175,9 +175,9 @@ object ServiceBinderProxy {
         // SNAKE ไม่ uninstall (process ตายพร้อม session) — แต่กัน :pN ที่ reuse
         // container แล้ว shutdown: ถอด wrapper ของเราออกจาก sCache ก่อน
         val cache = serviceManagerCache()
-        for ((name, proxy) in proxyCache.toList()) {
+        for ((name, _) in proxyCache.toList()) {
             val key = sCacheKeyOf(name) ?: continue
-            if (cache?.get(key) is BinderWrapper) cache.remove(key)
+            if (cache != null && cache[key] is BinderWrapper) cache.remove(key)
             proxyCache.remove(name)
             realServiceCache.remove(name)
         }
@@ -283,10 +283,10 @@ object ServiceBinderProxy {
     //  SNAKE bt0/j8/ob equivalents — the install machinery
     // ══════════════════════════════════════════
 
-    /** IXxx$Stub.asInterface(binder) — ทางเดียวกับ d30.java:6/ob.h() ใช้ */
+    /** IXxx${'$'}Stub.asInterface(binder) — ทางเดียวกับ d30.java:6/ob.h() ใช้ */
     private fun asInterfaceOf(iInterfaceClass: Class<*>, binder: IBinder): Any? {
         return try {
-            val stub = Class.forName(iInterfaceClass.name + "$Stub")
+            val stub = Class.forName(iInterfaceClass.name + "${'$'}Stub")
             stub.getMethod("asInterface", IBinder::class.java).invoke(null, binder)
         } catch (e: Exception) {
             Log.w(TAG, "asInterfaceOf ${iInterfaceClass.simpleName}: ${e.message}")
