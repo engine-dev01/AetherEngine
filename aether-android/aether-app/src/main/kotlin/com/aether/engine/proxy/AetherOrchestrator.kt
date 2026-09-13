@@ -520,17 +520,19 @@ object AetherOrchestrator {
             // 4b. start activity stub บน slot ที่ handshake สำเร็จ (r1.k/kl0 parity:
             //     stub component ต้องตรงกับ process suffix ของ provider ที่ปลุกขึ้น)
             val proxy = Intent()
+            val stubSuffix = if (handshook) slot else 0
             proxy.setClassName(
                 context,
-                "com.aether.engine.proxy.ProxyActivity\$P${if (handshook) slot else 0}",
+                "com.aether.engine.proxy.ProxyActivity\$P$stubSuffix",
             )
             proxy.putExtra("target_package", targetPkg)
             proxy.putExtra("target_sandbox", SandboxManager.getSandboxRoot()?.absolutePath)
             if (handshook) proxy.putExtra("guest_slot", slot)
             proxy.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(proxy)
-            Log.i(TAG, "launchInSandbox: ProxyActivity.P${if (handshook) slot else "0(fallback)")}" +
-                " dispatched for $targetPkg (handshake=$handshook)")
+            val label = if (handshook) "P$slot" else "P0(fallback)"
+            Log.i(TAG, "launchInSandbox: ProxyActivity.$label dispatched for " +
+                "$targetPkg (handshake=$handshook)")
             true
         } catch (e: Throwable) {
             Log.e(TAG, "launchInSandbox failed: ${e.message}")
