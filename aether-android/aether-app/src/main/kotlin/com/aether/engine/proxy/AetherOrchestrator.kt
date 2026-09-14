@@ -110,12 +110,11 @@ object AetherOrchestrator {
             // IO virtualization + hide detection + DEX loading
             try {
                 com.aether.Engine.enableIO()
-                // [CUT 2026-09-11] protection — hideXposed/network-probe/empty-dex
-                // ทำให้แอพกั๊กตัวเอง งดก่อนทดสอบการทำงานหลัก
-                // com.aether.Engine.hideXposed()
-                // com.aether.Engine.installNetworkHttpProbe()
-                // com.aether.Engine.loadEmptyDex()
-                Log.d(TAG, "IO system initialized (protection disabled for test)")
+                // [CUT 2026-09-11→2026-09-14] protection natives ตัด declaration แล้ว
+                // (hideXposed/installNetworkHttpProbe/loadEmptyDex — docs/CUTS.md;
+                //  อย่ารื้อกลับ: blueprint B3 = snake รันด้วย virtual mechanism
+                //  ไม่ใช่การซ่อน/ตรวจ) — enableIO/addIORule คืองานจริง
+                Log.d(TAG, "IO system initialized (protection cut per docs/CUTS.md)")
             } catch (e: Throwable) {
                 Log.w(TAG, "Phase 5 init: ${e.message}")
             }
@@ -125,16 +124,23 @@ object AetherOrchestrator {
             Log.d(TAG, "Native engine: loaded by EngineLoader (AetherApp)")
 
             // 7. Enable IO virtualization + register redirects from VirtualFSWrapper
+            // audit C4: telemetry เดิมอ้างจำนวน rules ที่ 'logไปว่า' register ทั้งที่
+            // native เป็น stub — ตอนนี้ native จริง (L1 VirtualFS) และ log = ค่าที่
+            // native คืน (nativeIORuleCount) ไม่ใช่จำนวนฝั่ง JVM
             try {
                 com.aether.Engine.enableIO()
-                // Register all existing redirects from VirtualFSWrapper to native
                 VirtualFSWrapper.listRedirects().forEach { rule ->
                     val parts = rule.split(" → ")
                     if (parts.size == 2) {
                         com.aether.Engine.addIORule(parts[0], parts[1])
                     }
                 }
-                Log.d(TAG, "VirtualFS: IO enabled, ${VirtualFSWrapper.size()} redirect rules registered")
+                val nativeCount = com.aether.Engine.nativeIORuleCount()
+                val claimed = VirtualFSWrapper.size()
+                if (nativeCount == claimed)
+                    Log.d(TAG, "VirtualFS: IO enabled, ${nativeCount} native rules (verified == JVM)")
+                else
+                    Log.w(TAG, "VirtualFS: IO MISMATCH native=$nativeCount jvm=$claimed")
             } catch (e: Throwable) {
                 Log.w(TAG, "VirtualFS init: ${e.message}")
             }
@@ -200,6 +206,10 @@ object AetherOrchestrator {
             }
 
             // 3. Setup VirtualFS for target (self = own package; external = game package)
+            // audit C13-vfs-clobber: guest identity กำลัง active (fake != host) →
+            // ห้าม setupForApp ชี้ map กลับ /data/user/0/com.aether ทับ guest
+            // (เดิม self-attach hardcode "com.aether" ทำ map หลุดทุกครั้งที่ :pN boot)
+            if (!isSelfAttach || !VirtualAppContainer.isVirtualTarget()) {
             val dataDir = if (isSelfAttach) {
                 "/data/user/0/com.aether"  // real host applicationId (not "com.aether.aether")
             } else {
@@ -213,6 +223,9 @@ object AetherOrchestrator {
                 fakePackage = VirtualAppContainer.getFakePackageName()
             )
             Log.d(TAG, "VirtualFS setup for PID $targetPidVal (self=$isSelfAttach)")
+            } else {
+                Log.i(TAG, "VirtualFS setup SKIPPED — guest map preserved (C13-clobber)")
+            }
 
             isAttached.set(true)
             attachTime = System.currentTimeMillis()
@@ -507,15 +520,18 @@ object AetherOrchestrator {
             //     → linkToDeath คุมชีพ + config ถึง child ก่อน activity dispatch
             val slot = GuestProcessTable.allocate(context, targetPkg)
             var handshook = false
-            if (slot >= 0) {
-                // p3.r semantics = ANDROID USER id (0..9) — ไม่ใช่ uid (SNAKE p3.p/q
-                // ต่างหากที่ถือ uid); A16: userId = uid / 100000
-                handshook = GuestProcessTable.spawnAndConfig(
-                    context, ClientConfig(targetPkg, slot, android.os.Process.myUid() / 100000),
-                )
-            } else {
-                Log.w(TAG, "launchInSandbox: no free slot (a7:317 semantics) → P0 fallback")
+            if (slot < 0) {
+                // audit C14: ห้าม dispatch ทับ slot ที่มี owner (เดิม 'else 0' =
+                // ไล่เกมเข้า :p0 ที่ diag/อื่นpins อยู่ → p3-first ชนะ → เด้ง)
+                // a7:317 semantics = คืน error 'No processes available'
+                Log.e(TAG, "launchInSandbox: no free slot (a7:317) — refused")
+                return false
             }
+            // p3.r semantics = ANDROID USER id (0..9) — ไม่ใช่ uid (SNAKE p3.p/q
+            // ต่างหากที่ถือ uid); A16: userId = uid / 100000
+            handshook = GuestProcessTable.spawnAndConfig(
+                context, ClientConfig(targetPkg, slot, android.os.Process.myUid() / 100000),
+            )
 
             // 4b. start activity stub บน slot ที่จองไว้ (r1.k/kl0 parity:
             //     stub component ต้องตรงกับ process suffix ของ provider ที่ปลุกขึ้น)
@@ -526,7 +542,7 @@ object AetherOrchestrator {
             //   ที่ allocate เสมอ ไม่ handshook ก็ dispatch P<slot> (framework
             //   spawn ผ่าน manifest process= อยู่แล้ว = พฤติกรรมก่อนมี handshake)
             val proxy = Intent()
-            val stubSuffix = if (slot >= 0) slot else 0
+            val stubSuffix = slot // slot<0 = refused ข้างบนแล้ว (C14)
             proxy.setClassName(
                 context,
                 "com.aether.engine.proxy.ProxyActivity\$P$stubSuffix",

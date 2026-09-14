@@ -386,10 +386,10 @@ object SandboxManager {
             ensureSandboxStructure(targetPkg)
             ensureDeviceToken(targetPkg)
 
- // 1. package.conf — ไม่ fabricate stub อีกต่อไป. guest manifest อ่าน live
-            //    จาก PackageManager (ProxyActivity.readGuestManifest). ถ้ามีไฟล์
-            //    จริงถูก provision มาแล้ว (จาก dump) ก็เก็บไว้; ไม่มีก็ไม่เขียน stub.
-            // (generatePackageConf ถูก deprecate — เขียน stub = ผิดหลักการ)
+ // 1. package.conf — engine เขียน registry เองจากเครื่องจริง (per-install);
+            //    guest manifest อ่าน live จาก PackageManager เป็น primary path
+            //    (ProxyActivity.readGuestManifest) — conf ใช้เป็น fallback/offline
+            //    snapshot เท่านั้น (= generatePackageConf ด้านล่าง ไม่ใช่ stub)
 
             // 3. package.conf — manifest snapshot (engine เขียน registry เอง
             //    จากเครื่องจริง — per-install: sourceDir/signature/versionCode
@@ -445,7 +445,7 @@ object SandboxManager {
         var n = 0
         filesDir.listFiles()?.forEach { f ->
             if (f.name.length == 64 && f.isFile) {
-                // ส่งต่อให้ native PayloadStore ผ่าน Engine.nativeWriteLog แบบ log นับ — ไม่ฝัง binary ใน APK
+                // log นับอย่างเดียว (Engine.nativeWriteLog ถูกตัด 2026-09-14 — docs/CUTS.md) — ไม่ฝัง binary ใน APK
                 n++
             }
         }

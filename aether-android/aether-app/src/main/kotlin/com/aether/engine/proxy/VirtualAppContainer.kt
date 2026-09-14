@@ -66,6 +66,10 @@ object VirtualAppContainer {
                 createFakeApplicationInfo()
                 createFakeApplication()
                 ServiceBinderProxy.setIdentity(context.packageName, fakePkg)
+                // audit C13-binder: setBinderCalling*Override คงไม่ถูกเรียกจนกว่า
+                // มี virtual-UID จริง (binder.cpp = state tracker; ของจริงคือ
+                // reflection ฝั่ง Kotlin) — เรียกด้วย host uid ตัวเอง = no-op หลอก
+                // gate; ดู docs/CUTS.md + D-series (virtual UID mapping)
                 Log.i(TAG, "Re-init identity → fake=$fakePkg (guest mode upgrade)")
             } else {
                 Log.w(TAG, "Already initialized")
@@ -236,14 +240,25 @@ object VirtualAppContainer {
     /** นับจำนวน service proxies ที่ active */
     fun getServiceProxyCount(): Int = ServiceBinderProxy.listProxiedServices().size
 
-    /** ทดสอบ VirtualFS: resolve fakePkg path → ควรคืน real dataDir */
+    /**
+     * ทดสอบ VirtualFS: resolve fakePkg path → ควรคืน real dataDir
+     * audit C13-vfs-selftest: เดิม assert กับ map ฝั่ง JVM อย่างเดียว → ไม่เห็นว่า
+     * native layer เป็น stub — ตอนนี้ round-trip ผ่าน nativeResolvePath ด้วย
+     */
     fun testVirtualFSResolve(): String {
         val testPath = "/data/user/0/$fakePackageName/files/test.txt"
         val resolved = virtualFS.resolve(testPath)
-        return if (resolved != testPath && resolved.isNotEmpty()) {
-            "OK: $testPath → $resolved"
-        } else {
-            "NO REDIRECT: $testPath"
+        val nativeOut = runCatching { com.aether.Engine.nativeResolvePath(testPath) }
+            .getOrNull()
+        val nativeCount = runCatching { com.aether.Engine.nativeIORuleCount() }.getOrDefault(-1)
+        val jvmOk = resolved != testPath && resolved.isNotEmpty()
+        return when {
+            jvmOk && nativeOut == resolved ->
+                "OK(jvm+native): $testPath → $resolved (rules=$nativeCount)"
+            jvmOk && nativeOut != null && nativeOut != resolved ->
+                "MISMATCH: jvm=$resolved native=$nativeOut (rules=$nativeCount)"
+            jvmOk -> "JVM-only: $testPath → $resolved (native rules=$nativeCount)"
+            else -> "NO REDIRECT: $testPath (native rules=$nativeCount)"
         }
     }
 

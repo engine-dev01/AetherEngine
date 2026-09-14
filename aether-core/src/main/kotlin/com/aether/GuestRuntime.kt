@@ -75,6 +75,8 @@ class GuestRuntime private constructor(
      *
      * Returns true on success, false ถ้า reflection fail ทุกขั้น (graceful).
      */
+    // hop-i provenance (audit C16): T2 = reference/NATIVE_CALLSITE_MAP.md hop21
+    // (jv0.O2:245 Native.i(SDK_INT)); T1 sig (I)V = reference/snake/F2_dex_natives.txt
     fun bindToActivityThread(): Boolean {
         val at = currentActivityThreadOrNull() ?: return false
         // Hard guard (verified crash 2026-09-07, logcat 21:38/21:39/21:40):

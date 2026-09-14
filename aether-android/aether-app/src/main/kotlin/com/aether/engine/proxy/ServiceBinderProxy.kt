@@ -10,7 +10,8 @@ import java.lang.reflect.Proxy
 /**
  * ServiceBinderProxy — binder proxy layer แบบ SNAKE (bt0/j8/ob parity)
  *
- * กลไก (สกัดจริงจาก jadx — ดู workspace/NATIVE_CALLSITE_MAP.md §5):
+ * กลไก (สกัดจริงจาก jadx — transcript: reference/NATIVE_CALLSITE_MAP.md §5,
+ *  T1 class/sig: reference/snake/F2_dex_natives.txt; ตัวเลขบรรทัด jadx = T2 — audit C16):
  *   1. realIface = IXxx$Stub.asInterface(ServiceManager.getService(key))
  *      (= SNAKE ob.h(): d30.java:6 / b40.java:28 — delegate ตัวจริง ไม่ใช่ raw binder)
  *   2. proxy = java.lang.reflect.Proxy(iInterfaceClass, handler)  (= ob.b():15)

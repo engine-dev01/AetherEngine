@@ -30,6 +30,24 @@ open class ProxyContentProvider : ContentProvider() {
     companion object {
         private const val TAG = "AetherProxyProvider"
         private const val METHOD_ROUTE = "route"
+
+        // wire_contract_check [W2]: keys ของ route protocol — single source (const)
+        // หมายเหตุ wire-scan 2026-09-14: ไม่มี client ฝั่งส่ง "route" ใน repo นี้
+        // (AetherIpcBridge เรียก native ตรงใน-process) = IPC surface สำรองสำหรับ
+        // cross-process remote-ops (future D9) — server ยังตอบถูก schema เสมอ
+        const val KEY_TARGET_ACTION = "target_action"
+        const val KEY_PID      = "pid"
+        const val KEY_MODULE   = "module"
+        const val KEY_ADDRESS  = "address"
+        const val KEY_SIZE     = "size"
+        const val KEY_BASE     = "base"
+        const val KEY_PATTERN  = "pattern"
+        const val KEY_MASK     = "mask"
+        const val KEY_SUCCESS  = "success"
+        const val KEY_ERROR    = "error"
+        const val KEY_DATA     = "data"
+        const val KEY_OFFSET   = "offset"
+        const val KEY_TIMESTAMP = "timestamp"
     }
 
     override fun onCreate(): Boolean {
@@ -45,11 +63,11 @@ open class ProxyContentProvider : ContentProvider() {
             return GuestProcessHolder.handleInit(extras)
         }
         if (METHOD_ROUTE != method) {
-            return Bundle().apply { putBoolean("success", false); putString("error", "unknown method: $method") }
+            return Bundle().apply { putBoolean(KEY_SUCCESS, false); putString(KEY_ERROR, "unknown method: $method") }
         }
 
-        val action = extras?.getString("target_action") ?: return Bundle().apply {
-            putBoolean("success", false); putString("error", "missing target_action")
+        val action = extras?.getString(KEY_TARGET_ACTION) ?: return Bundle().apply {
+            putBoolean(KEY_SUCCESS, false); putString(KEY_ERROR, "missing target_action")
         }
 
         return when (action) {
@@ -57,22 +75,22 @@ open class ProxyContentProvider : ContentProvider() {
             "read"   -> handleRead(extras)
             "scan"   -> handleScan(extras)
             "detach" -> handleDetach(extras)
-            "heartbeat" -> Bundle().apply { putBoolean("success", true); putLong("timestamp", System.currentTimeMillis()) }
-            else -> Bundle().apply { putBoolean("success", false); putString("error", "unknown action: $action") }
+            "heartbeat" -> Bundle().apply { putBoolean(KEY_SUCCESS, true); putLong(KEY_TIMESTAMP, System.currentTimeMillis()) }
+            else -> Bundle().apply { putBoolean(KEY_SUCCESS, false); putString(KEY_ERROR, "unknown action: $action") }
         }
     }
 
     private fun handleAttach(extras: Bundle): Bundle {
-        val pid = extras.getInt("pid", 0)
-        val module = extras.getString("module", "")
+        val pid = extras.getInt(KEY_PID, 0)
+        val module = extras.getString(KEY_MODULE, "")
         if (pid <= 0) return errorBundle("invalid pid: $pid")
 
         return try {
             val result = AetherIpcBridge.attach(pid, module)
             Bundle().apply {
-                putBoolean("success", result)
-                putInt("pid", pid)
-                putString("module", module)
+                putBoolean(KEY_SUCCESS, result)
+                putInt(KEY_PID, pid)
+                putString(KEY_MODULE, module)
             }
         } catch (e: Exception) {
             errorBundle("attach failed: ${e.message}")
@@ -80,16 +98,16 @@ open class ProxyContentProvider : ContentProvider() {
     }
 
     private fun handleRead(extras: Bundle): Bundle {
-        val pid = extras.getInt("pid", 0)
-        val address = extras.getLong("address", 0)
-        val size = extras.getLong("size", 0)
+        val pid = extras.getInt(KEY_PID, 0)
+        val address = extras.getLong(KEY_ADDRESS, 0)
+        val size = extras.getLong(KEY_SIZE, 0)
         if (pid <= 0 || address <= 0 || size <= 0) return errorBundle("invalid read params")
 
         return try {
             val data = AetherIpcBridge.read(pid, address, size)
             Bundle().apply {
-                putBoolean("success", data != null)
-                if (data != null) putByteArray("data", data)
+                putBoolean(KEY_SUCCESS, data != null)
+                if (data != null) putByteArray(KEY_DATA, data)
             }
         } catch (e: Exception) {
             errorBundle("read failed: ${e.message}")
@@ -97,18 +115,18 @@ open class ProxyContentProvider : ContentProvider() {
     }
 
     private fun handleScan(extras: Bundle): Bundle {
-        val pid = extras.getInt("pid", 0)
-        val base = extras.getLong("base", 0)
-        val size = extras.getLong("size", 4194304)
-        val pattern = extras.getByteArray("pattern")
-        val mask = extras.getString("mask", "")
+        val pid = extras.getInt(KEY_PID, 0)
+        val base = extras.getLong(KEY_BASE, 0)
+        val size = extras.getLong(KEY_SIZE, 4194304)
+        val pattern = extras.getByteArray(KEY_PATTERN)
+        val mask = extras.getString(KEY_MASK, "")
         if (pid <= 0 || pattern == null) return errorBundle("invalid scan params")
 
         return try {
             val offset = AetherIpcBridge.scan(pid, base, size, pattern, mask)
             Bundle().apply {
-                putBoolean("success", offset > 0)
-                putLong("offset", offset)
+                putBoolean(KEY_SUCCESS, offset > 0)
+                putLong(KEY_OFFSET, offset)
             }
         } catch (e: Exception) {
             errorBundle("scan failed: ${e.message}")
@@ -118,7 +136,7 @@ open class ProxyContentProvider : ContentProvider() {
     private fun handleDetach(extras: Bundle): Bundle {
         return try {
             AetherIpcBridge.detach()
-            Bundle().apply { putBoolean("success", true) }
+            Bundle().apply { putBoolean(KEY_SUCCESS, true) }
         } catch (e: Exception) {
             errorBundle("detach failed: ${e.message}")
         }
@@ -126,7 +144,7 @@ open class ProxyContentProvider : ContentProvider() {
 
     private fun errorBundle(msg: String): Bundle {
         Log.e(TAG, msg)
-        return Bundle().apply { putBoolean("success", false); putString("error", msg) }
+        return Bundle().apply { putBoolean(KEY_SUCCESS, false); putString(KEY_ERROR, msg) }
     }
 
     // Unused
