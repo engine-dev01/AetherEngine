@@ -10,7 +10,15 @@ Tier rules (memory 2026-09-13):
 import re, sys, pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-F2 = pathlib.Path("/var/minis/workspace/codes/Codes/SnakeLogic/fragments/F2_dex_natives.txt")
+# audit C10: ห้าม hardcode host path — ลำดับค้นหา repo-relative ก่อน
+_F2_CANDIDATES = [
+    ROOT / "reference/snake/F2_dex_natives.txt",                     # vendored (committed)
+    ROOT.parent / "codes/Codes/SnakeLogic/fragments/F2_dex_natives.txt",  # sibling bundle
+    pathlib.Path("/var/minis/workspace/codes/Codes/SnakeLogic/fragments/F2_dex_natives.txt"),
+]
+import os as _os
+_env = _os.environ.get("SNAKELOGIC_F2")
+F2 = pathlib.Path(_env) if _env else next((c for c in _F2_CANDIDATES if c.exists()), _F2_CANDIDATES[0])
 KT = ROOT / "aether-core/src/main/kotlin/com/aether/Engine.kt"
 CPP = ROOT / "aether-native/src/main/cpp/aether_core.cpp"
 

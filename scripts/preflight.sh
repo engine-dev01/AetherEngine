@@ -65,6 +65,21 @@ echo ""
 echo "[G3b] Native chain parity (codes/Codes evidence vs run-chain call-sites)"
 python3 scripts/native_chain_parity.py > /tmp/native_chain_parity.out 2>&1 && { PASS=$((PASS+1)); tail -2 /tmp/native_chain_parity.out; } || { FAIL=$((FAIL+1)); cat /tmp/native_chain_parity.out; err "chain hop ขาด/วางผิดตำแหน่ง (root cause เกมไม่รัน — ดู output ข้างบน)"; }
 
+# G3c: Structural gates (audit §7.8: orphan-TU / manifest↔slots / NO-OP markers)
+echo ""
+echo "[G3c] Structural gates (S1-S3)"
+python3 scripts/structural_gates.py && PASS=$((PASS+1)) || { FAIL=$((FAIL+1)); err "structural gate FAIL (orphan TU / slot mismatch / เขียวหลอก)"; }
+
+# G3d: Evidence provenance (C10/C16: T1 vendored + UNVERIFIED declared)
+echo ""
+echo "[G3d] Evidence check (reference/ T1 + citations)"
+sh scripts/evidence_check.sh > /tmp/evidence_check.out 2>&1 && { PASS=$((PASS+1)); tail -1 /tmp/evidence_check.out; } || { FAIL=$((FAIL+1)); cat /tmp/evidence_check.out; err "evidence gate FAIL"; }
+
+# G3e: Wire contract (single-source literals + Dart↔Kotlin type contract)
+echo ""
+echo "[G3e] Wire contract check (W1-W3)"
+python3 scripts/wire_contract_check.py && PASS=$((PASS+1)) || { FAIL=$((FAIL+1)); err "wire contract พัง (literal กระจัด/ type ข้าม codec ไม่ตรง)"; }
+
 # G4: Unresolved reference
 echo ""
 echo "[G4] Unresolved reference check (semantic)"

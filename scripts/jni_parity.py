@@ -97,5 +97,42 @@ def main():
     print(f"  \u2705 1:1 incl. descriptors ({len(kset)} methods)")
     return 0
 
+def dead_fun_guard():
+    """external fun ที่ไม่มี Kotlin call-site (นอก Engine.kt) = hop ที่ยังไม่ได้
+    wire หรือของตาย (audit C3) → FAIL; pending ที่อนุมัติแล้ว = WARN"""
+    dead_exempt = {"nativeProcessTriple", "nativeReflectUpdate",   # D6/D7
+                   "setBinderCallingPidOverride", "setBinderCallingUidOverride"}  # รอ virtual-UID (C13)
+    kt_dirs = [pathlib.Path("aether-android"), pathlib.Path("aether-core"), pathlib.Path("app")]
+    srcs = [q for d in kt_dirs for q in d.rglob("*.kt") if "/build/" not in str(q)]
+    funs = re.findall(r"external fun (\w+)", KT.read_text(encoding="utf-8"))
+    dead = []
+    for fn in funs:
+        pat = re.compile(r"(?<![A-Za-z0-9_])" + fn + r"(?![A-Za-z0-9_])")
+        used = False
+        for s in srcs:
+            if s == KT: continue
+            for line in s.read_text(encoding="utf-8", errors="replace").splitlines():
+                st = line.strip()
+                if st.startswith(("*", "//")) or "external fun" in line or ("fun " + fn) in line:
+                    continue
+                if pat.search(line):
+                    used = True; break
+            if used: break
+        if not used:
+            dead.append(fn)
+    rc = 0
+    for f in dead:
+        if f in dead_exempt:
+            print(f"  \u26a0 DEAD-PENDING (D6/D7 approved): {f}")
+        else:
+            print(f"  \u274c DEAD external fun (no call-site): {f}"); rc = 1
+    if rc == 0:
+        print("  \u2705 no unplanned dead external funs")
+    return rc
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    rc = main()
+    if rc == 0:
+        rc = dead_fun_guard()
+    sys.exit(rc)
