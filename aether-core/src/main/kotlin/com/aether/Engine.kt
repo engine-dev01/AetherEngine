@@ -33,10 +33,6 @@ object Engine {
     // ══════════════════════════════════════════
     external fun nativeOffset(): Long                      // Native offset discovery
     external fun nativeOffset2(): Long                     // Secondary offset discovery
-    external fun setBinderCallingPidOverride(newPid: Int): Int    // Override Binder PID
-    external fun setBinderCallingUidOverride(newUid: Int): Int    // Override Binder UID
-    external fun restoreBinderCallingPidOverride(oldPid: Int)     // Restore PID
-    external fun restoreBinderCallingUidOverride(oldUid: Int)     // Restore UID
 
     // ══════════════════════════════════════════
     //  Phase 4: String Encryption (native decryptor)
@@ -52,12 +48,12 @@ object Engine {
     external fun nativeExemptHiddenApi(): Boolean             // VMRuntime.setHiddenApiExemptions(["L"]) — audit C6
 
     // ══════════════════════════════════════════
-    //  Phase 3.1+3.2 — Payload hydration + decrypt (DATA_DUMP §4)
+    //  Phase 3.1+3.2 — Payload hydration + decrypt (DATA_DUMP(UNVERIFIED) §4)
     // ══════════════════════════════════════════
     external fun nativeHydratePayloads(dirPath: String, jklHex: String): Int   // loadDir + return count
 
     // ══════════════════════════════════════════
-    //  Phase 3.5.D — class-map registry (NATIVE_LOGIC.md §B)
+    //  Phase 3.5.D — class-map registry (NATIVE_LOGIC(transcript สูญ-UNVERIFIED) §B)
     //  Feeds the loadClass redirect table (JniHook custom_loadClass).
     // ══════════════════════════════════════════
     external fun addClassRule(dottedRequested: String, slashedTarget: String)  // register redirect

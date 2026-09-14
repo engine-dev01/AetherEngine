@@ -100,8 +100,7 @@ def main():
 def dead_fun_guard():
     """external fun ที่ไม่มี Kotlin call-site (นอก Engine.kt) = hop ที่ยังไม่ได้
     wire หรือของตาย (audit C3) → FAIL; pending ที่อนุมัติแล้ว = WARN"""
-    dead_exempt = {"nativeProcessTriple", "nativeReflectUpdate",   # D6/D7
-                   "setBinderCallingPidOverride", "setBinderCallingUidOverride"}  # รอ virtual-UID (C13)
+    dead_exempt = {"nativeProcessTriple", "nativeReflectUpdate"}  # D6/D7
     kt_dirs = [pathlib.Path("aether-android"), pathlib.Path("aether-core"), pathlib.Path("app")]
     srcs = [q for d in kt_dirs for q in d.rglob("*.kt") if "/build/" not in str(q)]
     funs = re.findall(r"external fun (\w+)", KT.read_text(encoding="utf-8"))

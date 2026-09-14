@@ -29,7 +29,6 @@ set(AETHER_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/core/flagger.cpp
     ${CMAKE_CURRENT_LIST_DIR}/core/jni_hook.cpp
     ${CMAKE_CURRENT_LIST_DIR}/core/class_map.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/core/string_decryptor.cpp
     ${CMAKE_CURRENT_LIST_DIR}/core/key_store.cpp
     ${CMAKE_CURRENT_LIST_DIR}/core/payload_store.cpp
 )

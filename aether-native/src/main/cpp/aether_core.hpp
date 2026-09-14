@@ -38,10 +38,7 @@ JNIEXPORT void       JNICALL Java_com_aether_Engine_nativeSetSeed(JNIEnv*, jclas
 // Hook + Binder
 JNIEXPORT jlong JNICALL Java_com_aether_Engine_nativeOffset(JNIEnv*, jclass);
 JNIEXPORT jlong JNICALL Java_com_aether_Engine_nativeOffset2(JNIEnv*, jclass);
-JNIEXPORT jint  JNICALL Java_com_aether_Engine_setBinderCallingPidOverride(JNIEnv*, jclass, jint);
-JNIEXPORT jint  JNICALL Java_com_aether_Engine_setBinderCallingUidOverride(JNIEnv*, jclass, jint);
-JNIEXPORT void  JNICALL Java_com_aether_Engine_restoreBinderCallingPidOverride(JNIEnv*, jclass, jint);
-JNIEXPORT void  JNICALL Java_com_aether_Engine_restoreBinderCallingUidOverride(JNIEnv*, jclass, jint);
+// (binder override ×4 cut 2026-09-14 — audit C13-binder; docs/CUTS.md)
 
 // Hidden-API exemption (audit C6) + IO virtualization ผ่าน L1 VirtualFS (C4/C5)
 JNIEXPORT jboolean JNICALL Java_com_aether_Engine_nativeExemptHiddenApi(JNIEnv*, jclass);
@@ -50,10 +47,10 @@ JNIEXPORT void     JNICALL Java_com_aether_Engine_addIORule(JNIEnv*, jclass, jst
 JNIEXPORT jstring  JNICALL Java_com_aether_Engine_nativeResolvePath(JNIEnv*, jclass, jstring);
 JNIEXPORT jint     JNICALL Java_com_aether_Engine_nativeIORuleCount(JNIEnv*, jclass);
 
-// Phase 3.1 — hydrate payloads (DATA_DUMP §4)
+// Phase 3.1 — hydrate payloads (DATA_DUMP(UNVERIFIED) §4)
 JNIEXPORT jint JNICALL Java_com_aether_Engine_nativeHydratePayloads(JNIEnv*, jclass, jstring, jstring);
 
-// Phase 3.5.D — class-map registry (NATIVE_LOGIC.md §B)
+// Phase 3.5.D — class-map registry (NATIVE_LOGIC(transcript สูญ-UNVERIFIED) §B)
 JNIEXPORT void JNICALL Java_com_aether_Engine_addClassRule(JNIEnv*, jclass, jstring, jstring);
 JNIEXPORT void JNICALL Java_com_aether_Engine_clearClassRules(JNIEnv*, jclass);
 JNIEXPORT jint  JNICALL Java_com_aether_Engine_classRuleCount(JNIEnv*, jclass);

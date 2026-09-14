@@ -6,11 +6,10 @@
 #include "core/crypto.hpp"
 #include "core/config.hpp"
 #include "core/stealth.hpp"
-#include "core/binder.hpp"
+#include "core/binder.hpp"   // Binder:: state tracker (JNI surface cut — docs/CUTS.md)
 #include "core/flagger.hpp"
 #include "core/jni_hook.hpp"
 #include "core/class_map.hpp"
-#include "core/string_decryptor.hpp"
 #include "core/payload_store.hpp"
 #include "core/key_store.hpp"
 #include "layer/bindmount/virtual_fs.hpp"
@@ -80,10 +79,6 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
         {"nativeSetSeed","(I)V",(void*)Java_com_aether_Engine_nativeSetSeed},
         {"nativeOffset","()J",(void*)Java_com_aether_Engine_nativeOffset},
         {"nativeOffset2","()J",(void*)Java_com_aether_Engine_nativeOffset2},
-        {"setBinderCallingPidOverride","(I)I",(void*)Java_com_aether_Engine_setBinderCallingPidOverride},
-        {"setBinderCallingUidOverride","(I)I",(void*)Java_com_aether_Engine_setBinderCallingUidOverride},
-        {"restoreBinderCallingPidOverride","(I)V",(void*)Java_com_aether_Engine_restoreBinderCallingPidOverride},
-        {"restoreBinderCallingUidOverride","(I)V",(void*)Java_com_aether_Engine_restoreBinderCallingUidOverride},
         {"enableIO","()V",(void*)Java_com_aether_Engine_enableIO},
         {"addIORule","(Ljava/lang/String;Ljava/lang/String;)V",(void*)Java_com_aether_Engine_addIORule},
         {"nativeHydratePayloads","(Ljava/lang/String;Ljava/lang/String;)I",(void*)Java_com_aether_Engine_nativeHydratePayloads},
@@ -177,10 +172,6 @@ JNIEXPORT void JNICALL Java_com_aether_Engine_nativeSetSeed(JNIEnv*, jclass, jin
 // ─── Hook + Binder ───
 JNIEXPORT jlong JNICALL Java_com_aether_Engine_nativeOffset(JNIEnv*, jclass) { return aether::Config::getOffset("offset"); }
 JNIEXPORT jlong JNICALL Java_com_aether_Engine_nativeOffset2(JNIEnv*, jclass) { return aether::Config::getOffset("offset2"); }
-JNIEXPORT jint JNICALL Java_com_aether_Engine_setBinderCallingPidOverride(JNIEnv*, jclass, jint pid) { return aether::Binder::overridePid(pid); }
-JNIEXPORT jint JNICALL Java_com_aether_Engine_setBinderCallingUidOverride(JNIEnv*, jclass, jint uid) { return aether::Binder::overrideUid(uid); }
-JNIEXPORT void JNICALL Java_com_aether_Engine_restoreBinderCallingPidOverride(JNIEnv*, jclass, jint old) { aether::Binder::restorePid(old); }
-JNIEXPORT void JNICALL Java_com_aether_Engine_restoreBinderCallingUidOverride(JNIEnv*, jclass, jint old) { aether::Binder::restoreUid(old); }
 
 // (decryptString/nativeValidate/... ตัด 2026-09-14 — audit C3/C4: ไม่มี caller
 //  ใน Kotlin run-chain; ดู docs/CUTS.md)
@@ -237,7 +228,7 @@ JNIEXPORT jboolean JNICALL Java_com_aether_Engine_nativeExemptHiddenApi(JNIEnv* 
     return JNI_TRUE;
 }
 
-// ─── Phase 3.5.D — class-map registry (NATIVE_LOGIC.md §B) ───
+// ─── Phase 3.5.D — class-map registry (NATIVE_LOGIC(transcript สูญ-UNVERIFIED) §B) ───
 // feed loadClass redirect table used by JniHook custom_loadClass → ClassMap::tryRedirect
 JNIEXPORT void JNICALL Java_com_aether_Engine_addClassRule(JNIEnv* e, jclass, jstring dotted, jstring slashedTarget) {
     if (!dotted || !slashedTarget) return;
@@ -247,9 +238,9 @@ JNIEXPORT void JNICALL Java_com_aether_Engine_addClassRule(JNIEnv* e, jclass, js
 JNIEXPORT void JNICALL Java_com_aether_Engine_clearClassRules(JNIEnv*, jclass) { aether::ClassMap::clear(); }
 JNIEXPORT jint JNICALL Java_com_aether_Engine_classRuleCount(JNIEnv*, jclass) { return (jint)aether::ClassMap::size(); }
 
-// ─── Phase 3.1+3.2 — payload hydration + decrypt (DATA_DUMP §4) ───
+// ─── Phase 3.1+3.2 — payload hydration + decrypt (DATA_DUMP(UNVERIFIED) §4) ───
 // nativeHydratePayloads(filesDir, jklHex) → loadDir(filesDir) + return count
-// jklHex = "010100640100000000000000000100001400000000006464000000000100" (DATA_DUMP §4.3)
+// jklHex = "010100640100000000000000000100001400000000006464000000000100" (DATA_DUMP(UNVERIFIED) §4.3)
 JNIEXPORT jint JNICALL Java_com_aether_Engine_nativeHydratePayloads(JNIEnv* e, jclass, jstring dir, jstring jklHex) {
     std::string dirPath = jstr(e, dir);
     std::string hex     = jstr(e, jklHex);

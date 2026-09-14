@@ -13,3 +13,5 @@ snake รันด้วย virtual mechanism ไม่ใช่การซ่�
 | execStartActivity hook (AetherInstrumentation) + rewriteToStub callers | 2026-09-14 | subclass override ของ hidden method ไม่เคย dispatch = dead โดยโครงสร้าง (audit C9); rewriteToStub คงไว้เป็นชิ้น P4 (binder-layer, @Suppress + KNOWN-PENDING) | doc ในไฟล์เดิมยอมรับ |
 | license natives snake (chl/djp/ilil/awl/aior/eio) — ไม่เคย port | 2026-09-13 | ตัดตามคำสั่งผู้ใช้ (login/license) + ไม่มีใน run-chain | blueprint L4 'ตัดทิ้งตาม B3' |
 | launchGame / getEngineStatus channel branches | 2026-09-14 | 0 callers ฝั่ง Dart (audit C1) | grep home_screen |
+| setBinderCallingPid/UidOverride + restore×2 (kt/table/cpp) | 2026-09-14 | audit C13-binder-restore-only: set ไม่เคยถูกเรียก → restore ไล่ตามของไม่ได้ติดตั้ง = telemetry หลอก; will-return พร้อม virtual-UID mapping (D8) — binder.cpp state tracker คงอยู่ (core, ไม่มี JNI surface) | grep 0 callers |
+| string_decryptor.cpp (TU) | 2026-09-14 | decryptStringJNI ถูกลบแล้ว (C3) → orphan จริง; cipher spec เก็บใน StrDecryptSmokeTest สำหรับ reimplement | C5 gate |
