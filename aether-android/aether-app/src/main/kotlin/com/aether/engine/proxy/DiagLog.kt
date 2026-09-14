@@ -53,6 +53,38 @@ object DiagLog {
         } catch (_: Throwable) { /* diagnostics never crash */ }
     }
 
+    /**
+     * audit C2: เขียนผล launch แบบ machine-readable ข้าม process
+     * (main → :pN → UI) — files/diag/launch_result.json
+     * bridge อ่านกลับเป็น Map ให้ Dart แสดง {ok, stage, reason, slot, handshake, identity}
+     */
+    fun writeResult(result: Map<String, String>) {
+        val base = dir ?: return
+        try {
+            val body = result.entries.joinToString(",") {
+                "\"${it.key}\":\"${it.value.replace("\"", "'")}\""
+            }
+            synchronized(lock) {
+                File(base, "launch_result.json")
+                    .writeText("{${body},\"ts\":${System.currentTimeMillis()},\"pid\":${Process.myPid()}}")
+            }
+            d(TAG, "launch_result: $result")
+        } catch (_: Throwable) { /* diagnostics never crash */ }
+    }
+
+    /** อ่าน launch_result.json ล่าสุด (caller = main process หลัง dispatch) */
+    fun readResult(): Map<String, String> {
+        val base = dir ?: return emptyMap()
+        return try {
+            val f = File(base, "launch_result.json")
+            if (!f.exists()) return emptyMap()
+            Regex("\"([a-zA-Z_]+)\":(\"[^\"]*\"|[0-9]+)").findAll(f.readText())
+                .associate { m ->
+                    m.groupValues[1] to m.groupValues[2].trim('"')
+                }
+        } catch (_: Throwable) { emptyMap() }
+    }
+
     /** Trace a throwable with full stack + cause chain. */
     fun err(tag: String, label: String, t: Throwable) {
         val sb = StringBuilder("$label: ${t.javaClass.name}: ${t.message}\n")

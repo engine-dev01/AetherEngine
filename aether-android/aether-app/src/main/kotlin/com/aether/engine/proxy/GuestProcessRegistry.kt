@@ -9,6 +9,11 @@ import android.util.Log
 /**
  * GuestProcessRegistry — SNAKE a7.m()/p3/jv0.P2 parity (ขั้น ② ของแผนประกอบ)
  *
+ * provenance (audit C16): ตัวเลขบรรทัด jadx (a7.java:171/317/601, jv0.P2:285 ฯลฯ)
+ * มาจาก T2 transcript — ตอนนี้ commit ไว้ที่ reference/NATIVE_CALLSITE_MAP.md
+ * แล้ว; T1 ที่ machine-verify ได้ = reference/snake/F2_dex_natives.txt (class+sig
+ * ระดับ DexLayout) — sig ตรวจซ้ำด้วย scripts/native_chain_parity.py ทุก preflight
+ *
  * หลักฐาน (NATIVE_CALLSITE_MAP.md §3 hops 10–12):
  *   a7.java:171 m(): Bundle "SnakeEngine_client_config" ← p3 → ContentResolver.call(
  *     content://com.snake.proxy_content_provider_<slot>, "_Engine_|_init_process_")
@@ -170,6 +175,17 @@ object GuestProcessHolder {
         }
     }
 
+    /**
+     * audit C14: ล้าง config — เรียกเมื่อ slot ถอดปล่อย/ผูกใหม่ เช่น guest session
+     * ก่อนหน้าจบลง (ProxyActivity.onDestroy) เพื่อไม่ให้ identity เก่าชนะ intent ใหม่
+     * (เดิม config ไม่เคยถูกล้างเลย = ปุ่ม diag ทิ้ง 'chaincheck' ปินไว้ตลอดชีพ)
+     */
+    fun reset() {
+        val had = config != null
+        config = null
+        if (had) Log.i(TAG, "p3 config reset (slot released)")
+    }
+
     /** ตอบ ProxyContentProvider.call(METHOD_INIT) — semantics เท่า jv0.P2:285 */
     fun handleInit(extras: Bundle?): Bundle {
         val pkg = extras?.getString(GuestProcessTable.EXTRA_GUEST_PKG)
@@ -181,13 +197,18 @@ object GuestProcessHolder {
             }
         }
         val cur = config
-        if (cur != null && cur.guestPkg != pkg) {
+        if (cur != null && cur.guestPkg != pkg && cur.guestPkg != DIAG_PKG) {
             // jv0.P2: "Reject init process: X, this process is: Y"
+            // ข้อยกเว้นเดียวของ audit C14: config ของปุ่มวินิจฉัย (DIAG_PKG) ไม่
+            // มีสิทธิ์ปinned slot ถาวร — session จริงต้อง rebind ทับได้เสมอ
             Log.e(TAG, "Reject init: $pkg — process bound to ${cur.guestPkg} (slot ${cur.slot})")
             return Bundle().apply {
                 putBoolean(GuestProcessTable.EXTRA_SUCCESS, false)
                 putString(GuestProcessTable.EXTRA_ERROR, "reject:${cur.guestPkg}")
             }
+        }
+        if (cur != null && cur.guestPkg == DIAG_PKG && pkg != DIAG_PKG) {
+            Log.i(TAG, "rebinding over diag config: $DIAG_PKG → $pkg (C14)")
         }
         config = ClientConfig(pkg, slot, extras.getInt(GuestProcessTable.EXTRA_USER_ID, 0))
         Log.i(TAG, "p3 accepted: $pkg → slot $slot (SNAKE jv0.P2 parity)")
@@ -196,4 +217,7 @@ object GuestProcessHolder {
             putBinder(GuestProcessTable.BUNDLE_CLIENT, clientBinder)
         }
     }
+
+    /** package ปลอมที่ chain-check ใช้ — const เดียวทั้ง repo (C14) */
+    const val DIAG_PKG = "com.aether.test.chaincheck"
 }
