@@ -177,13 +177,16 @@ class _HomeScreenState extends State<HomeScreen> {
         await _snack('$pkg not installed — install it first, then press Play');
         return;
       }
-      final ok = await _channel.invokeMethod<bool>(
+      final r = await _channel.invokeMethod<Map<Object?, Object?>>(
         'launchInSandbox',
         {'packageName': pkg},
-      );
-      await _snack(ok == true
-          ? 'Virtualizing $pkg (in-process) — see logcat for guest state'
-          : 'Failed to virtualize $pkg (engine issue — see logcat)');
+      ) ?? const {};
+      final ok = r['ok'] == true;
+      final stage = r['stage'] ?? '?';
+      final reason = r['reason'] ?? '';
+      await _snack(ok
+          ? 'Virtualizing $pkg (in-process, stage=$stage) — see Diag'
+          : 'Virtualize FAILED at hop [$stage]: $reason');
       await _refreshVirtualApp();
       await _refreshStats();
     });
@@ -293,14 +296,17 @@ class _HomeScreenState extends State<HomeScreen> {
         await _snack('$pkg not installed — install it first, then try again');
         return;
       }
-      final ok = await _channel.invokeMethod<bool>(
+      final r = await _channel.invokeMethod<Map<Object?, Object?>>(
         'launchInSandbox',
         {'packageName': pkg},
-      );
+      ) ?? const {};
+      final okB = r['ok'] == true;
+      final stageS = (r['stage'] ?? '?').toString();
+      final reasonS = (r['reason'] ?? '').toString();
       await _refreshVirtualApp();
-      await _snack(ok == true
-          ? 'Virtualized $pkg (in-process)'
-          : 'Could not virtualize $pkg (engine issue — see logcat)');
+      await _snack(okB
+          ? 'Virtualized $pkg (in-process, stage=$stageS)'
+          : 'FAILED [$stageS]: $reasonS');
     });
   }
 

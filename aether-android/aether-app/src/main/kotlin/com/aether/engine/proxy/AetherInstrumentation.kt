@@ -18,7 +18,8 @@ import android.os.IBinder
  *
  * Two intercepts on the process's ActivityThread.mInstrumentation:
  *
- *   Hook A — execStartActivity (hidden, via reflection guard):
+ *   Hook A — (cut audit C9: execStartActivity subclass ไม่เคย dispatch;
+ *            binder-layer rewrite วางแผนไว้ที่ ServiceBinderProxy = blueprint P4)
  *     rewrite an Intent targeting a GUEST activity (not in our manifest) into
  *     the registered STUB (ProxyActivity$P0), stashing the real guest intent.
  *     AMS then sees a component IT KNOWS → launches in :p0 instead of routing
@@ -33,10 +34,18 @@ import android.os.IBinder
  */
 class AetherInstrumentation(
     private val base: Instrumentation,
-    private val stubComponent: String,   // e.g. com.aether.engine.proxy.ProxyActivity$P0
-    private val guestClassLoader: ClassLoader,
-    private val guestApp: Application?,
+    // audit C8-stale-hook: ต้อง rebind เมื่อ identity เปลี่ยน (เดิม val ทั้งคู่)
+    private var stubComponent: String,   // e.g. com.aether.engine.proxy.ProxyActivity$P0
+    private var guestClassLoader: ClassLoader,
+    private var guestApp: Application?,
 ) : Instrumentation() {
+
+    /** audit C8-stale-hook: แทนค่า identity บน wrapper ที่ติดตั้งอยู่แล้ว */
+    fun rebind(stub: String, loader: ClassLoader, app: Application?) {
+        this.stubComponent = stub
+        this.guestClassLoader = loader
+        this.guestApp = app
+    }
 
     companion object {
         private const val TAG = "AetherInstr"
@@ -57,14 +66,33 @@ class AetherInstrumentation(
             guestClassLoader: ClassLoader,
             guestApp: Application?,
         ): Boolean {
-            if (installed) return true
             return try {
+                if (installed) {
+                    // audit C8-stale-hook: rebind wrapper เดียวที่ mInstrumentation ถือ
+                    val atCls0 = Class.forName("android.app.ActivityThread")
+                    val at0 = atCls0.getMethod("currentActivityThread").invoke(null)
+                    val cur0 = (atCls0.getDeclaredField("mInstrumentation").also {
+                        it.isAccessible = true }.get(at0)) as? AetherInstrumentation
+                    if (cur0 != null) {
+                        cur0.rebind(stubComponent, guestClassLoader, guestApp)
+                        DiagLog.d(TAG, "rebind reused wrapper stub=" + stubComponent)
+                        return true
+                    }
+                    installed = false
+                }
                 val atCls = Class.forName("android.app.ActivityThread")
                 val at = atCls.getMethod("currentActivityThread").invoke(null) ?: return false
                 val f = atCls.getDeclaredField("mInstrumentation")
                 f.isAccessible = true
                 val current = f.get(at) as? Instrumentation ?: return false
-                if (current is AetherInstrumentation) { installed = true; return true }
+                if (current is AetherInstrumentation) {
+                    // wrapper จาก session ก่อนยังอยู่ (reset() แค่ลืม flag) —
+                    // ต้อง rebind ไม่งั้น identity ใหม่หายเงียบ (seam test จับได้)
+                    current.rebind(stubComponent, guestClassLoader, guestApp)
+                    installed = true
+                    DiagLog.d(TAG, "install found existing wrapper → rebind stub=" + stubComponent)
+                    return true
+                }
                 val wrapper = AetherInstrumentation(current, stubComponent, guestClassLoader, guestApp)
                 f.set(at, wrapper)
                 installed = true
@@ -74,6 +102,12 @@ class AetherInstrumentation(
                 DiagLog.err(TAG, "install failed", e)
                 false
             }
+        }
+
+        /** audit C8: session จบ (ProxyActivity.onDestroy) → อนุญาต install ใหม่ */
+        fun reset() {
+            installed = false
+            DiagLog.d(TAG, "reset - next install() rebinds fresh identity")
         }
 
         /**
@@ -180,30 +214,34 @@ class AetherInstrumentation(
         // Fix: before onCreate, install the GUEST's real ActivityInfo (its own
         // theme, softInputMode, uiOptions, flags...) and re-apply the guest
         // theme so getResources()/getTheme() resolve in the guest's space.
+        // audit C8: guestApp/stubComponent เป็น var (rebind ได้) → local capture
+        // ครั้งเดียวต่อ call เพื่อ smart-cast + กัน race ระหว่าง session swap
+        val gapp = guestApp
+        val stub = stubComponent
         try {
-            if (guestApp != null && activity.javaClass.name != stubComponent &&
-                activity.packageName != guestApp.packageName) {
+            if (gapp != null && activity.javaClass.name != stub &&
+                activity.packageName != gapp.packageName) {
                 // 0) FORCE-GUEST Resources (round-8, SNAKE-proven zg0.k/a5):
                 //    Before ANY cache-null/recreate cycle, replace the host-table
                 //    Resources (MiuiResourcesImpl) with one built on the guest's
                 //    own arsc (addAssetPath guest apk FIRST). All subsequent
                 //    lazy re-inits (delegate, theme, inflater) then resolve in
                 //    the guest id space.
-                buildGuestResources(guestApp.packageName!!)?.let { gres ->
+                buildGuestResources(gapp.packageName!!)?.let { gres ->
                     findFieldUp(activity.javaClass, "mResources")?.let { fl ->
                         fl.isAccessible = true
                         fl.set(activity, gres)
                     }
                     // guest app context: its mResources field drives
                     // getApplicationContext().getResources() too
-                    findFieldUp(guestApp.javaClass, "mResources")?.let { fl ->
+                    findFieldUp(gapp.javaClass, "mResources")?.let { fl ->
                         fl.isAccessible = true
-                        fl.set(guestApp, gres)
+                        fl.set(gapp, gres)
                     }
                     // The base ContextImpl behind the guest app context caches
                     // its Resources in mResourcesInner — same table swap
                     runCatching {
-                        val appCtx = guestApp
+                        val appCtx = gapp
                         if (appCtx != null) {
                             val mBaseF = findFieldUp(appCtx.javaClass, "mBase")
                             if (mBaseF != null) {
@@ -375,41 +413,18 @@ private fun buildGuestResources(guestPkg: String): android.content.res.Resources
         return null
     }
 
-    // ─── Hook A: rewrite guest-targeted startActivity → stub, stash real ───
-    // execStartActivity is hidden API; we override via reflection-compatible
-    // signature. Android has kept this signature stable since API 16; if it
-    // differs, this override simply won't be invoked and we pass through.
-
-    fun execStartActivity(
-        who: Context?,
-        contextThread: IBinder?,
-        token: IBinder?,
-        target: Activity?,
-        intent: Intent,
-        requestCode: Int,
-        options: Bundle?,
-    ): Any? {
-        rewriteToStub(intent)
-        return try {
-            val m = Instrumentation::class.java.getDeclaredMethod(
-                "execStartActivity",
-                Context::class.java, IBinder::class.java, IBinder::class.java,
-                Activity::class.java, Intent::class.java, Int::class.javaPrimitiveType,
-                Bundle::class.java
-            )
-            m.isAccessible = true
-            m.invoke(base, who, contextThread, token, target, intent, requestCode, options)
-        } catch (e: Throwable) {
-            DiagLog.err(TAG, "execStartActivity delegate failed", e)
-            null
-        }
-    }
 
     /**
      * If [intent] targets a guest activity (a class NOT in our manifest under
      * the guest package), stash the guest class and retarget the intent at the
      * registered stub so AMS launches it in :p0 instead of routing out.
+     *
+     * audit C9: ผู้เรียกเดิม (execStartActivity subclass) ตายโดยโครงสร้าง → ลบไป
+     * แล้ว; logic นี้คือชิ้นที่ blueprint P4 จะประกอบใหม่ *ที่ binder layer*
+     * (ServiceBinderProxy.handleActivityCall → startActivity) ไม่ใช่ subclass —
+     * ยังไม่ wire = dead code ที่ตั้งใจ (P4), gate นับเป็น KNOWN-PENDING.
      */
+    @Suppress("unused")
     private fun rewriteToStub(intent: Intent) {
         try {
             val comp = intent.component ?: return

@@ -174,7 +174,7 @@ object GuestRuntimeBridge {
             RuntimeMode.V2_ONLY -> loadV2(hostContext, targetPkg, appClassHint,
                 callOnCreate, providers, sandboxDir, events)
             RuntimeMode.V1_ONLY -> loadV1(hostContext, targetPkg, appClassHint,
-                callOnCreate, providers, events)
+                callOnCreate, providers, events, sandboxDir)
             RuntimeMode.DUAL -> loadDual(hostContext, targetPkg, appClassHint,
                 callOnCreate, providers, sandboxDir, events)
             RuntimeMode.AUTO -> loadAuto(hostContext, targetPkg, appClassHint,
@@ -237,7 +237,7 @@ object GuestRuntimeBridge {
         // Fallback to v1
         events.add(LoadEvent.FallbackTriggered(v2.reason))
         Log.w(TAG, "v2 failed (${v2.reason}) → fallback to v1")
-        return loadV1(hostContext, targetPkg, appClassHint, callOnCreate, providers, events)
+        return loadV1(hostContext, targetPkg, appClassHint, callOnCreate, providers, events, sandboxDir)
     }
 
     // ══════════════════════════════════════════
@@ -336,7 +336,19 @@ object GuestRuntimeBridge {
         callOnCreate: Boolean,
         providers: List<String>,
         events: MutableList<LoadEvent>,
+        sandboxDir: java.io.File? = null,
     ): LoadResult {
+        // audit C13-v1-drops-sandbox: v1 loader ไม่รองรับ sandboxDir —
+        // fallback เงียบ = guest อ่าน data จริงของตัวเอง (หลุด sandbox)
+        if (sandboxDir != null) {
+            events.add(LoadEvent.V1Failure("refused: v1 has no sandboxDir support (C13)"))
+            return LoadResult(
+                success = false,
+                reason = "v1 fallback refused: no sandboxDir support (would escape sandbox)",
+                targetPackage = targetPkg,
+                runtimeSource = "none",
+            )
+        }
         events.add(LoadEvent.V1Start("v1 fallback"))
         val r = VirtualAppLoader.load(
             hostContext, targetPkg, appClassHint,
@@ -376,6 +388,6 @@ object GuestRuntimeBridge {
         if (v2.success) return v2
 
         events.add(LoadEvent.FallbackTriggered(v2.reason))
-        return loadV1(hostContext, targetPkg, appClassHint, callOnCreate, providers, events)
+        return loadV1(hostContext, targetPkg, appClassHint, callOnCreate, providers, events, sandboxDir)
     }
 }

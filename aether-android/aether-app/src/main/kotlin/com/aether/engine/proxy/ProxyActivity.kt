@@ -28,15 +28,32 @@ open class ProxyActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // audit C15-diag-order: init ก่อนทุกบรรทัดที่ log (เดิม line แรกของ chain
+        // คือ DiagLog.d ตอน dir==null → บรรทัด identity ที่หายไปจาก trace.log)
+        DiagLog.init(applicationContext)
 
         // ★ p3-first identity (SNAKE semantics: ทุก getter ใน child อ่าน jv0.D2()
-        //   = p3 ไม่ใช่ intent — jv0.E2():58): ถ้า handshake ยื่น config ตอน
-        //   provider install แล้ว ให้ config ชนะ intent extras เสมอ
+        //   = p3 ไม่ใช่ intent — jv0.E2():58): config ชนะ intent extras —
+        //   ยกเว้นเดียว (audit C14): config ที่ค้างจากปุ่มวินิจฉัย (DIAG_PKG)
+        //   ห้ามชนะ session จริง → reset แล้วใช้ intent
         val p3 = GuestProcessHolder.config
         val intentPkg = intent.getStringExtra("target_package") ?: "com.aether"
-        val targetPkg = p3?.guestPkg?.takeIf { it.isNotEmpty() } ?: intentPkg
-        if (p3 != null && p3.guestPkg != intentPkg) {
-            DiagLog.d("ProxyActivity", "identity: p3=${p3.guestPkg} overrides intent=$intentPkg")
+        if (p3 != null && p3.guestPkg == GuestProcessHolder.DIAG_PKG && intentPkg != GuestProcessHolder.DIAG_PKG) {
+            DiagLog.d("ProxyActivity",
+                "identity: diag config (${p3.guestPkg}) ล้างทิ้ง — guest จริง=$intentPkg (C14)")
+            GuestProcessHolder.reset()
+        }
+        val p3Eff = GuestProcessHolder.config
+        val targetPkg = p3Eff?.guestPkg?.takeIf { it.isNotEmpty() } ?: intentPkg
+        if (p3Eff != null && p3Eff.guestPkg != intentPkg) {
+            // audit C14: mismatch จริง (ไม่ใช่ diag) = chain พัง — รายงาน ไม่ใช่เงียบ
+            DiagLog.d("ProxyActivity", "identity: p3=${p3Eff.guestPkg} overrides intent=$intentPkg")
+            DiagLog.writeResult(linkedMapOf(
+                "ok" to "false", "stage" to "identity",
+                "reason" to "p3=${p3Eff.guestPkg}!=intent=$intentPkg",
+                "identity" to p3Eff.guestPkg, "slot" to p3Eff.slot.toString()))
+            finish()
+            return
         }
         val isVirtual = targetPkg.isNotEmpty() && targetPkg != "com.aether"
 
@@ -46,7 +63,6 @@ open class ProxyActivity : Activity() {
         val guestDataDir = intent.getStringExtra("target_sandbox")
             ?.let { root -> File(root, "data/user/0/$targetPkg") }
 
-        DiagLog.init(applicationContext)
         DiagLog.d("ProxyActivity", "onCreate target=$targetPkg virtual=$isVirtual pid=${android.os.Process.myPid()}")
         // capture getApplication()/resources state BEFORE any guest work — this
         // is what the framework reads in handleLaunchActivity (crash point).
@@ -70,9 +86,16 @@ open class ProxyActivity : Activity() {
             DiagLog.d("ProxyActivity", "VirtualAppContainer ready for $targetPkg")
         } catch (e: Throwable) {
             DiagLog.err("ProxyActivity", "VirtualAppContainer setup failed", e)
+            DiagLog.writeResult(linkedMapOf(
+                "ok" to "false", "stage" to "container", "reason" to (e.message ?: e.javaClass.simpleName),
+                "identity" to targetPkg))
         }
 
         // 2. Self-attach via AetherOrchestrator (no external intent)
+        //    audit C13-vfs-clobber: เดิม hardcode "com.aether" → setupForApp ชี้
+        //    VirtualFS กลับ host ทับ map ของ guest ที่ step 1 ตั้งไว้; virtual mode
+        //    ต้อง attach ด้วย identity เดิมของ process (host — เพราะเราคือ host
+        //    process ที่ pin ตัวเอง) แต่ห้าม re-point VFS เมื่อ guest map active
         try {
             val ownPid = android.os.Process.myPid()
             val attached = com.aether.engine.proxy.AetherOrchestrator.attachToProcess(
@@ -100,14 +123,25 @@ open class ProxyActivity : Activity() {
             // not happen (hook missing) — finish to avoid a blank stub.
             if (intent.getStringExtra(AetherInstrumentation.EXTRA_GUEST_CLASS) != null) {
                 DiagLog.d("ProxyActivity", "relaunch reached bootstrap — swap did not happen; finishing")
+                DiagLog.writeResult(linkedMapOf(
+                    "ok" to "false", "stage" to "swap",
+                    "reason" to "newActivity passthrough — hook miss (stub!=installed)",
+                    "identity" to targetPkg))
                 finish()
                 return
             }
             installGuestThreadFirewall()
             var launched = false
+            // audit C2: stage tracking → launch_result.json (UI บอก hop ที่ตายจริง)
+            var stage = "manifest"
+            var loadReason = ""
             try {
                 val gm = readGuestManifest(targetPkg)
                 DiagLog.d("ProxyActivity", "manifest: app=${gm.appClass} launcher=${gm.launcher} providers=${gm.providers.size}")
+                if (gm.launcher.isNullOrEmpty()) {
+                    loadReason = "launcher not resolved from manifest/conf"
+                } else {
+                stage = "guest-load"
                 // S1 currentApplication + S2 providers + S3 onCreate.
                 // Step 3: migrate to GuestRuntimeBridge (v2 compat layer).
                 // Bridge delegates to v2 (GuestRuntime) with auto-fallback to v1.
@@ -168,8 +202,18 @@ open class ProxyActivity : Activity() {
                     // instance finishes, AMS relaunches P0 (standard singleTop-style
                     // recreation), and AetherInstrumentation.newActivity swaps it
                     // to the guest class via the extras above.
+                } else {
+                    stage = "instrumentation"
+                    loadReason = res.reason.ifEmpty {
+                        if (!res.success) "guest load failed"
+                        else if (res.guestClassLoader == null) "no guest classloader"
+                        else "launcher unresolved"
+                    }
                 }
+                } // else launcher != null
             } catch (e: Throwable) {
+                stage = "guest-load"
+                loadReason = "${e.javaClass.simpleName}: ${e.message}"
                 DiagLog.err("ProxyActivity", "guest launch exception", e)
             }
             // dump full process logcat (framework + our traces) for post-mortem.
@@ -183,6 +227,12 @@ open class ProxyActivity : Activity() {
                 } catch (ie: InterruptedException) { /* keep go */ }
                 DiagLog.dumpLogcat("after guest launch (launched=$launched)")
             }.start()
+            DiagLog.writeResult(linkedMapOf(
+                "ok" to launched.toString(),
+                "stage" to if (launched) "recreate" else stage,
+                "reason" to (if (launched) "relaunch scheduled" else loadReason.ifEmpty { "unknown" }),
+                "identity" to targetPkg,
+                "slot" to (GuestProcessHolder.config?.slot ?: -1).toString()))
             if (launched) {
                 // Relaunch THIS instance through the framework: recreate() runs
                 // the normal activity lifecycle (onDestroy → onCreate) WITHOUT a
@@ -193,45 +243,35 @@ open class ProxyActivity : Activity() {
                 DiagLog.d("ProxyActivity", "recreate() → relaunch with guest extras")
                 runOnUiThread { recreate() }
             } else {
-                // Launch failed — nothing to show, close the bootstrap instance.
+                // Launch failed — reason อยู่ใน launch_result.json แล้ว (C2);
+                // guest session จบ → คืน Holder ให้ slot ว่างจาก identity เก่า (C14)
+                GuestProcessHolder.reset()
                 finish()
             }
             return
         }
 
         // 4. Non-virtual (self/host) mode: finish — no external Intent dispatched
+        DiagLog.writeResult(linkedMapOf(
+            "ok" to "true", "stage" to "host", "reason" to "non-virtual (host mode)",
+            "identity" to targetPkg))
         finish()
     }
 
     /**
-     * Scaffold-4: start the guest launcher activity THROUGH the stub.
-     *
-     * The intent is REWRITTEN UP FRONT to ProxyActivity$P0 (registered in our
-     * manifest under :p0) with the real guest class/package stashed in extras —
-     * then AetherInstrumentation.newActivity (hook B, public override) swaps the
-     * stub back to the real guest Activity inside :p0.
-     *
-     * Previously this dispatched setClassName(targetPkg, launcher) directly and
-     * relied on execStartActivity to rewrite it. execStartActivity is a HIDDEN
-     * API that ActivityThread invokes via reflection on the concrete framework
-     * signature — a Kotlin subclass method is never dispatched, so the rewrite
-     * never ran and AMS routed the intent OUT to the real installed app.
+     * audit C8-never-closed: guest runtime ต้องถูกปิดเมื่อ stub จบ — ปล่อยค้างไว้
+     * ทำให้ relaunch รอบถัดไปเจอ classloader/identity ของ session เก่า (C8-stale-hook)
      */
-    private fun startGuestActivity(targetPkg: String, launcher: String): Boolean {
-        return try {
-            val intent = AetherInstrumentation.buildStubIntent(
-                hostPkg = packageName,
-                stubComponent = "com.aether.engine.proxy.ProxyActivity\$P0",
-                guestPkg = targetPkg,
-                guestClass = launcher,
-            )
-            startActivity(intent)
-            DiagLog.d("ProxyActivity", "guest activity dispatched via stub: $targetPkg/$launcher → P0")
-            true
-        } catch (e: Throwable) {
-            DiagLog.err("ProxyActivity", "startGuestActivity($launcher)", e)
-            false
+    override fun onDestroy() {
+        if (isFinishing) {
+            runCatching { GuestRuntimeBridge.close() }
+                .onFailure { DiagLog.d("ProxyActivity", "bridge close: ${it.message}") }
+            // guest session จบจริง (ไม่ใช่ recreate — recreate ไม่เรียก onDestroy
+            // ของ instance เก่า... บน API บางรุ่นเรียก — guard ด้วย isFinishing)
+            runCatching { GuestProcessHolder.reset() }
+            runCatching { AetherInstrumentation.reset() }
         }
+        super.onDestroy()
     }
 
     /**
@@ -245,24 +285,31 @@ open class ProxyActivity : Activity() {
         if (firewallInstalled) return
         firewallInstalled = true
         val prev = Thread.getDefaultUncaughtExceptionHandler()
+        val swallowed = java.util.concurrent.atomic.AtomicInteger(0)
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
             val isMain = t === Looper.getMainLooper().thread
             DiagLog.err("ProxyActivity", "guest-firewall caught on ${t.name} (main=$isMain)", e)
-            DiagLog.dumpLogcat("firewall main=$isMain thread=${t.name}")
-            // GUEST ISOLATION: once the guest Application has been started in
-            // this process, SDK background work (GMS dynamite measurement,
-            // WorkManager, Crashlytics, Play Games shortcuts...) regularly
-            // throws SecurityException because binder calls carry the guest
-            // package name under our host UID. These are NOT host bugs and
-            // must NOT kill the whole process — KOS survives them via its
-            // VirtualServiceContext; we survive them by containing EVERY
-            // exception from guest-started work (any thread, including main
-            // Handler messages dispatched by guest SDKs).
-            // A truly-dead main looper is unrecoverable either way, but the
-            // framework has already torn the activity down by the time an
-            // uncaught handler runs — swallowing here keeps the process alive
-            // so the guest activity (already dispatched) can still launch.
-            // DO NOT propagate to prev (default kill) while a guest is active.
+            // audit C15: นับ + รายงานผ่าน launch_result แทนเงียบ (เดิม dumpLogcat
+            // ทุกครั้ง = ถล่ม buffer; ตอนนี้ทุก 5 ครั้ง)
+            val n = swallowed.incrementAndGet()
+            DiagLog.writeResult(linkedMapOf(
+                "ok" to "false", "stage" to "firewall",
+                "reason" to e.javaClass.simpleName + " on " + t.name + " (swallowed #" + n + ")",
+                "identity" to (GuestProcessHolder.config?.guestPkg ?: "?")))
+            if (n % 5 == 1) DiagLog.dumpLogcat("firewall main=$isMain thread=${t.name}")
+            // audit C15-firewall-swallows (strict): swallow เฉพาะ known-benign =
+            // SecurityException บน background thread (GMS dynamite/WorkManager/
+            // shortcuts ที่ binder ถือ guest pkg ใต้ host UID); ทุกกรณีอื่น —
+            // รวม main thread — ต้อง chain ให้ prev (system default) เพื่อ
+            // process ตายจริง + มี tombstone/dropbox ให้ diagnosis (01:18
+            // mystery-disappearance ที่ crashed:false จะไม่มองไม่เห็นอีก)
+            val benign = e is SecurityException && !isMain
+            if (!benign && prev != null) {
+                DiagLog.d("ProxyActivity", "firewall CHAIN→prev: ${e.javaClass.name} main=$isMain")
+                try { prev.uncaughtException(t, e) } catch (_: Throwable) { }
+            } else {
+                DiagLog.d("ProxyActivity", "firewall swallowed benign=${benign} on ${t.name}")
+            }
         }
     }
 
@@ -324,4 +371,11 @@ open class ProxyActivity : Activity() {
     class P1 : ProxyActivity()
     class P2 : ProxyActivity()
     class P3 : ProxyActivity()
+
+    // audit C7 (F3 parity): landscape stubs — guest (8BP) ล็อก orientation;
+    // ไม่มี stub ฝั่ง landscape = ไม่มี component ให้ AMS ตอนหมุนจอ/relaunch
+    class P0_L : ProxyActivity()
+    class P1_L : ProxyActivity()
+    class P2_L : ProxyActivity()
+    class P3_L : ProxyActivity()
 }

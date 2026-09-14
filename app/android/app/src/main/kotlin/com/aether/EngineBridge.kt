@@ -13,9 +13,8 @@ import io.flutter.plugin.common.MethodChannel.Result
  * com.aether.engine_bridge — Flutter ↔ Aether shell bridge (Phase 3)
  *
  * Phase 3 methods (in-process, no external Intent unless user opts-in):
- *   - launchGame        : engine health check (in-process)
+ *   (launchGame/getEngineStatus cut 2026-09-14 — audit C1: 0 Dart callers)
  *   - isTargetInstalled : is a package installed? (precheck before virtualization)
- *   - getEngineStatus   : orchestrator state
  *   - getEngineStats    : full stats (readCount, scanCount, uptime, etc)
  *   - readMemory        : read N bytes from module base (demo: libaether.so .text)
  *   - scanAOB           : scan a hex pattern in module .text (demo)
@@ -65,9 +64,9 @@ object EngineBridge : MethodCallHandler {
     override fun onMethodCall(call: MethodCall, result: Result) {
         try {
             when (call.method) {
-                "launchGame" -> result.success(launchGame(call.argument<String>("packageName")))
-                "isTargetInstalled" -> result.success(isTargetInstalled(call.argument<String>("packageName")))
-                "getEngineStatus" -> result.success(getEngineStatus())
+                            "isTargetInstalled" -> result.success(isTargetInstalled(call.argument<String>("packageName")))
+                // "getEngineStatus" branch ตัด (audit C1: 0 callers ฝั่ง Dart —
+                // UI ใช้ getEngineStats)
                 "getEngineStats" -> result.success(getEngineStats())
                 "getVirtualAppStatus" -> result.success(getVirtualAppStatus())
                 "testVirtualFS" -> result.success(testVirtualFS())
@@ -108,13 +107,6 @@ object EngineBridge : MethodCallHandler {
     //  Engine methods — all block body
     // ══════════════════════════════════════════
 
-    private fun launchGame(@Suppress("UNUSED_PARAMETER") pkg: String?): Boolean {
-        val o = com.aether.engine.proxy.AetherOrchestrator
-        val healthy = o.isInitialized() && o.isAttachedToProcess() && o.isEngineRunning()
-        Log.i(TAG, "launchGame(pkg=$pkg) → healthy=$healthy")
-        return healthy
-    }
-
     /**
      * isTargetInstalled — checks whether [packageName] is installed on this device.
      * Used by Flutter UI to precheck before virtualization (so we never silently
@@ -135,16 +127,6 @@ object EngineBridge : MethodCallHandler {
             Log.w(TAG, "isTargetInstalled($packageName) error: ${e.message}")
             false
         }
-    }
-
-    private fun getEngineStatus(): Map<String, Any> {
-        val o = com.aether.engine.proxy.AetherOrchestrator
-        val out = HashMap<String, Any>()
-        out["initialized"] = o.isInitialized()
-        out["attached"] = o.isAttachedToProcess()
-        out["running"] = o.isEngineRunning()
-        out["selfAttach"] = true
-        return out
     }
 
     private fun getEngineStats(): Map<String, Any> {
@@ -293,17 +275,57 @@ object EngineBridge : MethodCallHandler {
      * external Intent. Returns false if the orchestrator is not ready or the
      * target could not be virtualized.
      */
-    private fun launchInSandbox(packageName: String): Boolean {
-        val c = ctx ?: return false
-        if (packageName.isEmpty()) return false
+    private fun launchInSandbox(packageName: String): Any {
+        val c = ctx ?: return mapOf("ok" to false, "stage" to "bridge", "reason" to "no context")
+        if (packageName.isEmpty())
+            return mapOf("ok" to false, "stage" to "bridge", "reason" to "empty package")
         return try {
             val ok = com.aether.engine.proxy.AetherOrchestrator.launchInSandbox(c, packageName)
-            Log.i(TAG, "launchInSandbox($packageName) → $ok")
-            ok
+            Log.i(TAG, "launchInSandbox($packageName) -> $ok")
+            if (!ok) mapOf("ok" to false, "stage" to "dispatch",
+                "reason" to "orchestrator refused - see chainCheck/trace")
+            else launchResultAwait(packageName)
         } catch (e: Throwable) {
             Log.e(TAG, "launchInSandbox($packageName) failed: ${e.message}")
-            false
+            mapOf("ok" to false, "stage" to "bridge",
+                "reason" to (e.javaClass.simpleName + ": " + e.message))
         }
+    }
+
+    /**
+     * audit C2: :pN เขียน files/diag/launch_result.json ข้าม process —
+     * รอแบบ non-blocking บน background thread แล้วคืน Map{ok,stage,reason,identity,slot}
+     */
+    private fun launchResultAwait(packageName: String): Any {
+        val t0 = System.currentTimeMillis()
+        val done = java.util.concurrent.CountDownLatch(1)
+        val result = java.util.concurrent.atomic.AtomicReference<Map<String, String>>(emptyMap())
+        Thread {
+            var m: Map<String, String> = emptyMap()
+            repeat(10) {
+                try { Thread.sleep(400) } catch (_: InterruptedException) { }
+                m = com.aether.engine.proxy.DiagLog.readResult()
+                // ts ต้องใหม่กว่า t0 — ไม่งั้นเป็น result ค้างจาก session ก่อน (stale)
+                val fresh = (m["ts"]?.toLongOrNull() ?: 0L) > t0
+                if (fresh && m["identity"] == packageName &&
+                    (m["ok"] == "false" || m["stage"] == "recreate")) {
+                    result.set(m); done.countDown(); return@Thread
+                }
+            }
+            result.set(m.filterKeys { it != "ts" })  // timeout: ถ้าไม่ fresh ก็ทิ้ง
+            done.countDown()
+        }.start()
+        done.await(4200, java.util.concurrent.TimeUnit.MILLISECONDS)
+        val m = result.get().filterKeys { it != "ts" }
+        val out = LinkedHashMap<String, Any>(m)
+        if (m.isEmpty()) {
+            out["ok"] = true
+            out["stage"] = "pending"
+            out["reason"] = "child ยังไม่เขียน result ใน 4.2s - กด Diag ดู trace"
+        } else {
+            out["ok"] = m["ok"] == "true"   // Dart เทียบ == true (bool)
+        }
+        return out
     }
 
     /**
@@ -333,6 +355,14 @@ object EngineBridge : MethodCallHandler {
                     val lines = it.readText().lines()
                     sb.append(lines.takeLast(400).joinToString("\n"))
                 }
+            // audit C15-diag-nocrash: แนบ crash report ล่าสุด (CrashHandler เขียน
+            // filesDir/crash_logs/ — readDiag เดิมไม่เคยแสดง)
+            java.io.File(c.filesDir, "crash_logs").listFiles { f ->
+                f.name.startsWith("crash_") && f.name.endsWith(".log")
+            }?.maxByOrNull { it.lastModified() }?.let {
+                sb.append("\n\u2550\u2550\u2550 ${it.name} (${it.length()}B) \u2550\u2550\u2550\n")
+                sb.append(it.readLines().takeLast(80).joinToString("\n"))
+            }
             sb.toString()
         } catch (e: Throwable) {
             "readDiag failed: ${e.message}"
@@ -406,11 +436,14 @@ object EngineBridge : MethodCallHandler {
         return try {
             // endpoint เดียวกับ spawner จริง (GuestProcessTable) — ใช้ helper + key
             // ชุดเดียวกัน ห้าม hardcode ซ้ำ (บทเรียน schema ไม่ตรงกันทั้งระบบ)
+            // audit C14: diag ต้องไม่กิน slot 0 ของ guest จริง — ใช้ slot สุดท้าย
+            val diagSlot = com.aether.engine.proxy.GuestProcessTable.MAX_SLOTS - 1
             val uri = android.net.Uri.parse(
-                com.aether.engine.proxy.GuestProcessTable.providerAuthority(0))
+                com.aether.engine.proxy.GuestProcessTable.providerAuthority(diagSlot))
             val extras = com.aether.engine.proxy.GuestProcessTable.configToBundle(
                 com.aether.engine.proxy.ClientConfig(
-                    "com.aether.test.chaincheck", 0, android.os.Process.myUid() / 100000))
+                    com.aether.engine.proxy.GuestProcessHolder.DIAG_PKG, diagSlot,
+                    android.os.Process.myUid() / 100000))
             val reply = c.contentResolver.call(uri,
                 com.aether.engine.proxy.GuestProcessTable.METHOD_INIT, null, extras)
             if (reply == null) "✗ reply=null"

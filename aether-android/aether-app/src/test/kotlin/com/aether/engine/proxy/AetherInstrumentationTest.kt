@@ -70,4 +70,46 @@ class AetherInstrumentationTest {
         assertEquals("install must return false on plain JVM (no ActivityThread)",
             false, result)
     }
+
+    @Test
+    fun `install rebinds on second guest session (audit C8-stale-hook + C11 seam)`() {
+        // C11 seam: stub ActivityThread.holder = instance ที่มี mInstrumentation
+        // (≡ success path บนเครื่องจริง — framework วาง Instrumentation ไว้ก่อนเสมอ)
+        val at = android.app.ActivityThread()
+        at.mInstrumentation = android.app.Instrumentation()
+        android.app.ActivityThread.holder = at
+        try {
+            val loader1 = ClassLoader.getSystemClassLoader()
+            val ok1 = AetherInstrumentation.install(
+                "com.aether.engine.proxy.ProxyActivity\$P1", loader1, null)
+            assertTrue("install success path ต้อง true เมื่อ seam ให้ AT", ok1)
+            val wrapper = at.mInstrumentation as? AetherInstrumentation
+            assertNotNull("mInstrumentation ต้องถูกแทนด้วย wrapper", wrapper)
+
+            // session 2 (installed แล้ว, identity ใหม่): ต้อง rebind wrapper เดิม
+            val loader2 = java.net.URLClassLoader(emptyArray())
+            val ok2 = AetherInstrumentation.install(
+                "com.aether.engine.proxy.ProxyActivity\$P2", loader2, null)
+            assertTrue(ok2)
+            org.junit.Assert.assertSame("wrapper เดียวต้องถูก reuse (rebind)",
+                wrapper, at.mInstrumentation)
+            val fStub = AetherInstrumentation::class.java.getDeclaredField("stubComponent")
+            fStub.isAccessible = true
+            assertEquals("rebind แล้ว stub ต้องเปลี่ยน",
+                "com.aether.engine.proxy.ProxyActivity\$P2", fStub.get(wrapper))
+
+            // reset (≡ ProxyActivity.onDestroy) → install รอบใหม่สร้าง wrapper ใหม่
+            AetherInstrumentation.reset()
+            val ok3 = AetherInstrumentation.install(
+                "com.aether.engine.proxy.ProxyActivity\$P3", loader1, null)
+            assertTrue(ok3)
+            // wrapper เดิมถูก rebind (ไม่ใช่ instance ใหม่) — identity ต้องใหม่จริง
+            assertNotNull(at.mInstrumentation)
+            assertEquals("rebind หลัง reset ได้ stub ใหม่",
+                "com.aether.engine.proxy.ProxyActivity\$P3", fStub.get(at.mInstrumentation))
+        } finally {
+            android.app.ActivityThread.holder = null
+            AetherInstrumentation.reset()  // คืน state ให้ test อื่น (degraded path)
+        }
+    }
 }
