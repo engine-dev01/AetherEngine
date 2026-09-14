@@ -356,7 +356,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       final report = '═══ KEY 1234 — call-stack chain check ═══\n'
           '${hops ?? "(null)"}\n'
-          '── provider handshake (a7.m simulation, slot 0) ──\n'
+          '── provider handshake (a7.m simulation, diag slot 3) ──\n'
           '${hs ?? "(null)"}\n\n'
           'PASS = ทุก hop ตอบสอดคล้อง; "REAL"/"✗" = จุดที่ chain ขาด';
       setState(() => _lastOp = 'chainCheck done');

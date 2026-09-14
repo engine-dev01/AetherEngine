@@ -98,8 +98,10 @@ open class ProxyActivity : Activity() {
         //    process ที่ pin ตัวเอง) แต่ห้าม re-point VFS เมื่อ guest map active
         try {
             val ownPid = android.os.Process.myPid()
+            // C13-vfs-clobber: เดิม hardcode "com.aether" ที่ call-site; ตอนนี้
+            // attachToProcess อ่าน identity จริงของ process เอง (param = null)
             val attached = com.aether.engine.proxy.AetherOrchestrator.attachToProcess(
-                ownPid, "", "com.aether"
+                ownPid, ""
             )
             if (attached) {
                 com.aether.engine.proxy.AetherOrchestrator.startEngine()
@@ -122,7 +124,7 @@ open class ProxyActivity : Activity() {
             // Note: if this code is reached with extras present, the swap did
             // not happen (hook missing) — finish to avoid a blank stub.
             if (intent.getStringExtra(AetherInstrumentation.EXTRA_GUEST_CLASS) != null) {
-                DiagLog.d("ProxyActivity", "relaunch reached bootstrap — swap did not happen; finishing")
+                DiagLog.d("ProxyActivity", "swap-miss: reported via launch_result + finish (C2)")
                 DiagLog.writeResult(linkedMapOf(
                     "ok" to "false", "stage" to "swap",
                     "reason" to "newActivity passthrough — hook miss (stub!=installed)",
@@ -243,7 +245,7 @@ open class ProxyActivity : Activity() {
                 DiagLog.d("ProxyActivity", "recreate() → relaunch with guest extras")
                 runOnUiThread { recreate() }
             } else {
-                // Launch failed — reason อยู่ใน launch_result.json แล้ว (C2);
+                // exit=reported (C2): เหตุผลอยู่ใน launch_result.json แล้ว;
                 // guest session จบ → คืน Holder ให้ slot ว่างจาก identity เก่า (C14)
                 GuestProcessHolder.reset()
                 finish()

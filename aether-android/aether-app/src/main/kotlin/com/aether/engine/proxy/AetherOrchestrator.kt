@@ -165,7 +165,11 @@ object AetherOrchestrator {
      * @param moduleName — module name to attach (e.g., "" (empty = skip attach)
      * @param packageName — game package name
      */
-    fun attachToProcess(pid: Int, moduleName: String, packageName: String = ""): Boolean {
+    fun attachToProcess(
+        pid: Int,
+        moduleName: String,
+        packageName: String? = null,   // C13: null → identity จริงของ process นี้
+    ): Boolean {
         if (!isInitialized.get()) {
             Log.e(TAG, "Not initialized")
             return false
@@ -186,7 +190,11 @@ object AetherOrchestrator {
         targetPid.set(targetPidVal)
         targetModule.set(0) // resolved by native
         targetModuleName = moduleToAttach
-        targetPackage = if (isSelfAttach) "com.aether" else packageName
+        // C13-vfs-clobber (device proof 13:01:47 — hardcode 'com.aether' ทำ
+        // setupForApp ชี้ map กลับ host ทับ guest): identity = fake package
+        // ปัจจุบันของ process (host mode → com.aether, guest mode → ชื่อ guest)
+        val effectivePkg = packageName ?: VirtualAppContainer.getFakePackageName()
+        targetPackage = if (isSelfAttach) effectivePkg else packageName!!
 
         try {
             // 1. Find module base address (self or external)
@@ -210,11 +218,7 @@ object AetherOrchestrator {
             // ห้าม setupForApp ชี้ map กลับ /data/user/0/com.aether ทับ guest
             // (เดิม self-attach hardcode "com.aether" ทำ map หลุดทุกครั้งที่ :pN boot)
             if (!isSelfAttach || !VirtualAppContainer.isVirtualTarget()) {
-            val dataDir = if (isSelfAttach) {
-                "/data/user/0/com.aether"  // real host applicationId (not "com.aether.aether")
-            } else {
-                "/data/user/0/$packageName"
-            }
+            val dataDir = "/data/user/0/" + (if (isSelfAttach) effectivePkg else packageName!!)
             val virtualFS = VirtualAppContainer.getVirtualFS()
             virtualFS.setupForApp(
                 dataDir = dataDir,
@@ -579,14 +583,9 @@ object AetherOrchestrator {
         // ArtHookEngine.unhookAll() — removed (no-op)
         SandboxManager.init(appContext!!) // re-init to clear state
 
-        // Binder override cleanup
-        try {
-            com.aether.Engine.restoreBinderCallingPidOverride(0)
-            com.aether.Engine.restoreBinderCallingUidOverride(0)
-            Log.d(TAG, "Binder PID/UID overrides restored")
-        } catch (e: Throwable) {
-            Log.w(TAG, "Binder cleanup: ${e.message}")
-        }
+        // Binder PID/UID: ไม่มี override ที่ติดตั้งใน process นี้ — set* ถูกเรียก
+        // เมื่อ virtual-UID mapping พร้อม (C13-binder: restore ไล่ตามของที่ไม่ได้
+        // set = เทเลเมทริคหลอก; ตัดออก คง native ไว้รอ D8/binder-identity work)
 
         // 4. Reset counters
         readCount = 0
