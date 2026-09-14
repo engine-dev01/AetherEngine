@@ -108,8 +108,8 @@ log count สำเร็จ/ล้ม.
    guest Application สร้าง+ผูก context โดย VirtualAppLoader.
 
 ## SANDBOX PATH MOVE
-- sandbox root ย้าย `/data/user/0/com.aether/files/vision` →
-  `/data/user/0/com.aether/vision` (dataDir root ตรง). ทุก caller
+- sandbox root: `files/vision` → `vision` → **ปัจจุบัน `dataDir/root`**
+  (P1 2026-09-14 เปลี่ยน `vision`→`root` ตาม blueprint L0 — ห้ามรื้อชื่อเก่ากลับ). ทุก caller
   (SandboxManager.init, AetherApp, AetherOrchestrator, CrashHandler) ชี้
   `context.dataDir/vision` ผ่าน SandboxManager.getSandboxRoot().
 

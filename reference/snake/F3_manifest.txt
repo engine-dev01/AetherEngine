@@ -1,0 +1,267 @@
+=== F3 AndroidManifest.xml (binary AXML, decoded) ===
+package        : com.snake
+versionName    : 2.2.6
+versionCode    : None
+minSdk / target: 28 / 35
+application    : com.snake.App
+main activity  : com.Entry
+
+--- permissions (184) ---
+  android.permission.ACCESS_NETWORK_STATE
+  android.permission.POST_NOTIFICATIONS
+  android.permission.WAKE_LOCK
+  com.google.android.c2dm.permission.RECEIVE
+  android.permission.FOREGROUND_SERVICE_SPECIAL_USE
+  android.permission.FOREGROUND_SERVICE_DATA_SYNC
+  android.permission.QUERY_ADVANCED_PROTECTION_MODE
+  android.permission.QUERY_ALL_PACKAGES
+  android.permission.CREDENTIAL_MANAGER_SET_ALLOWED_PROVIDERS
+  android.permission.BIND_EXTERNAL_SERVICE
+  android.permission.WRITE_SOCIAL_STREAM
+  android.permission.READ_SOCIAL_STREAM
+  android.permission.READ_PROFILE
+  android.permission.WRITE_PROFILE
+  android.permission.READ_USER_DICTIONARY
+  android.permission.WRITE_USER_DICTIONARY
+  android.permission.USE_CREDENTIALS
+  android.permission.AUTHENTICATE_ACCOUNTS
+  android.permission.DETECT_SCREEN_CAPTURE
+  com.samsung.svoice.sync.READ_DATABASE
+  com.samsung.svoice.sync.ACCESS_SERVICE
+  com.samsung.svoice.sync.WRITE_DATABASE
+  com.sec.android.app.voicenote.Controller
+  com.sec.android.permission.VOIP_INTERFACE
+  com.sec.android.permission.LAUNCH_PERSONAL_PAGE_SERVICE
+  com.samsung.android.providers.context.permission.WRITE_USE_APP_FEATURE_SURVEY
+  com.samsung.android.providers.context.permission.READ_RECORD_AUDIO
+  com.samsung.android.providers.context.permission.WRITE_RECORD_AUDIO
+  com.sec.android.settings.permission.SOFT_RESET
+  sec.android.permission.READ_MSG_PREF
+  com.samsung.android.scloud.backup.lib.read
+  com.samsung.android.scloud.backup.lib.write
+  com.android.alarm.permission.SET_ALARM
+  com.android.voicemail.permission.ADD_VOICEMAIL
+  com.android.voicemail.permission.READ_WRITE_ALL_VOICEMAIL
+  com.huawei.authentication.HW_ACCESS_AUTH_SERVICE
+  com.android.vending.BILLING
+  com.android.vending.CHECK_LICENSE
+  com.google.android.providers.talk.permission.READ_ONLY
+  com.google.android.providers.talk.permission.WRITE_ONLY
+  com.google.android.gms.permission.ACTIVITY_RECOGNITION
+  com.google.android.gms.permission.AD_ID_NOTIFICATION
+  com.google.android.providers.gsf.permission.READ_GSERVICES
+  com.android.launcher.permission.INSTALL_SHORTCUT
+  com.android.launcher.permission.UNINSTALL_SHORTCUT
+  android.permission.READ_APP_BADGE
+  com.google.android.launcher.permission.READ_SETTINGS
+  com.oppo.launcher.permission.READ_SETTINGS
+  com.oppo.launcher.permission.WRITE_SETTINGS
+  me.everything.badger.permission.BADGE_COUNT_READ
+  me.everything.badger.permission.BADGE_COUNT_WRITE
+  com.android.launcher.permission.READ_SETTINGS
+  com.sec.android.provider.badge.permission.READ
+  com.sec.android.provider.badge.permission.WRITE
+  com.htc.launcher.permission.READ_SETTINGS
+  com.htc.launcher.permission.UPDATE_SHORTCUT
+  com.sonyericsson.home.permission.BROADCAST_BADGE
+  com.sonymobile.home.permission.PROVIDER_INSERT_BADGE
+  com.anddoes.launcher.permission.UPDATE_COUNT
+  com.majeur.launcher.permission.UPDATE_BADGE
+  com.huawei.android.launcher.permission.CHANGE_BADGE
+  com.huawei.android.launcher.permission.READ_SETTINGS
+  com.huawei.android.launcher.permission.WRITE_SETTINGS
+  com.android.launcher.permission.READ_SETTINGS
+  com.android.launcher.permission.WRITE_SETTINGS
+  com.android.launcher3.permission.READ_SETTINGS
+  com.android.launcher2.permission.READ_SETTINGS
+  com.teslacoilsw.launcher.permission.READ_SETTINGS
+  com.actionlauncher.playstore.permission.READ_SETTINGS
+  com.mx.launcher.permission.READ_SETTINGS
+  com.anddoes.launcher.permission.READ_SETTINGS
+  com.apusapps.launcher.permission.READ_SETTINGS
+  com.tsf.shell.permission.READ_SETTINGS
+  com.htc.launcher.permission.READ_SETTINGS
+  com.lenovo.launcher.permission.READ_SETTINGS
+  com.oppo.launcher.permission.READ_SETTINGS
+  com.bbk.launcher2.permission.READ_SETTINGS
+  com.s.launcher.permission.READ_SETTINGS
+  cn.nubia.launcher.permission.READ_SETTINGS
+  com.huawei.android.launcher.permission.READ_SETTINGS
+  com.huawei.android.launcher.permission.CHANGE_BADGE
+  android.permission.INTERNET
+  android.permission.CAMERA
+  android.permission.FLASHLIGHT
+  android.permission.CAMERA
+  android.permission.ACCESS_COARSE_LOCATION
+  android.permission.ACCESS_FINE_LOCATION
+  android.permission.ACCESS_LOCATION_EXTRA_COMMANDS
+  android.permission.ACCESS_WIFI_STATE
+  android.permission.CHANGE_NETWORK_STATE
+  android.permission.CHANGE_WIFI_MULTICAST_STATE
+  android.permission.CHANGE_WIFI_STATE
+  android.permission.MOUNT_UNMOUNT_FILESYSTEMS
+  android.permission.WRITE_EXTERNAL_STORAGE
+  android.permission.READ_EXTERNAL_STORAGE
+  android.permission.BATTERY_STATS
+  android.permission.BODY_SENSORS
+  android.permission.BROADCAST_STICKY
+  android.permission.DISABLE_KEYGUARD
+  android.permission.EXPAND_STATUS_BAR
+  android.permission.GET_ACCOUNTS
+  android.permission.MANAGE_ACCOUNTS
+  android.permission.READ_PHONE_STATE
+  android.permission.CHANGE_CONFIGURATION
+  android.permission.WRITE_SETTINGS
+  android.permission.GET_TASKS
+  android.permission.KILL_BACKGROUND_PROCESSES
+  android.permission.REORDER_TASKS
+  android.permission.PERSISTENT_ACTIVITY
+  android.permission.RECORD_AUDIO
+  android.permission.BLUETOOTH_CONNECT
+  android.permission.BLUETOOTH_SCAN
+  android.permission.BLUETOOTH
+  android.permission.BLUETOOTH_ADMIN
+  android.permission.NFC
+  android.permission.MODIFY_AUDIO_SETTINGS
+  android.permission.VIBRATE
+  android.permission.USE_FINGERPRINT
+  com.android.browser.permission.READ_HISTORY_BOOKMARKS
+  com.android.browser.permission.WRITE_HISTORY_BOOKMARKS
+  android.permission.CLEAR_APP_CACHE
+  android.permission.GET_PACKAGE_SIZE
+  android.permission.WRITE_SYNC_SETTINGS
+  android.permission.READ_SYNC_SETTINGS
+  android.permission.READ_SYNC_STATS
+  android.permission.SUBSCRIBED_FEEDS_READ
+  android.permission.SUBSCRIBED_FEEDS_WRITE
+  android.permission.WRITE_CALENDAR
+  android.permission.READ_CALENDAR
+  android.permission.READ_CONTACTS
+  android.permission.WRITE_CONTACTS
+  android.permission.READ_LOGS
+  android.permission.RESTART_PACKAGES
+  android.permission.SET_TIME
+  android.permission.SET_TIME_ZONE
+  android.permission.SET_WALLPAPER
+  android.permission.SET_WALLPAPER_HINTS
+  android.permission.TRANSMIT_IR
+  android.permission.USE_SIP
+  android.permission.GET_INTENT_SENDER_INTENT
+  android.permission.BIND_DIRECTORY_SEARCH
+  android.permission.UPDATE_APP_OPS_STATS
+  android.permission.INSTALL_PACKAGES
+  android.permission.DELETE_PACKAGES
+  android.permission.CLEAR_APP_USER_DATA
+  android.permission.WRITE_MEDIA_STORAGE
+  android.permission.ACCESS_CACHE_FILESYSTEM
+  android.permission.DEVICE_POWER
+  android.permission.BIND_APPWIDGET
+  android.permission.ACCOUNT_MANAGER
+  android.permission.PACKAGE_USAGE_STATS
+  android.permission.READ_INSTALL_SESSIONS
+  android.permission.READ_OWNER_DATA
+  android.permission.READ_CELL_BROADCASTS
+  android.permission.WRITE_CLIPS
+  android.permission.READ_CLIPS
+  android.permission.GET_CLIPS
+  android.permission.WRITE_OWNER_DATA
+  android.permission.ACCESS_GPS
+  android.permission.ACCESS_WIMAX_STATE
+  android.permission.ACCESS_DOWNLOAD_MANAGER
+  android.permission.CHANGE_WIMAX_STATE
+  android.permission.DOWNLOAD_WITHOUT_NOTIFICATION
+  android.permission.CALL_PHONE
+  android.permission.SEND_SMS
+  android.permission.PROCESS_OUTGOING_CALLS
+  android.permission.PROCESS_OUTGOING_CALLS
+  android.permission.CALL_PHONE
+  android.permission.READ_CALL_LOG
+  android.permission.WRITE_CALL_LOG
+  android.provider.Telephony.SMS_RECEIVED
+  android.permission.BROADCAST_WAP_PUSH
+  android.permission.BROADCAST_SMS
+  android.permission.SEND_RESPOND_VIA_MESSAGE
+  android.permission.GET_INTENT_SENDER_INTENT
+  android.permission.FOREGROUND_SERVICE
+  android.permission.MANAGE_EXTERNAL_STORAGE
+  android.permission.QUERY_ALL_PACKAGES
+  android.permission.HIDE_OVERLAY_WINDOWS
+  com.google.android.gms.permission.AD_ID
+  android.permission.ACCESS_ADSERVICES_ATTRIBUTION
+  android.permission.ACCESS_ADSERVICES_AD_ID
+  com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE
+  com.snake.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+
+--- components (51) ---
+  activity       com.Entry
+  receiver       com.google.firebase.iid.FirebaseInstanceIdReceiver
+  service        com.google.firebase.messaging.FirebaseMessagingService
+  service        com.google.firebase.components.ComponentDiscoveryService
+  provider       com.snake.helper.SystemCallProvider
+  provider       androidx.core.content.FileProvider
+  provider       com.snake.helper.FileProvider
+  receiver       com.snake.helper.ProxyBroadcastReceiver
+  service        com.snake.helper.DaemonService
+  service        com.snake.helper.DaemonService$DaemonInnerService
+  service        com.snake.helper.ProxyVpnService
+  activity       com.snake.helper.ProxyActivity
+  activity       com.snake.helper.InternalWebBrowser
+  activity       com.snake.helper.ProxyActivity$P0
+  activity       com.snake.helper.ProxyActivity$P0_L
+  activity       com.snake.helper.ProxyActivity$P1
+  activity       com.snake.helper.ProxyActivity$P1_L
+  activity       com.snake.helper.ProxyActivity$P2
+  activity       com.snake.helper.ProxyActivity$P2_L
+  activity       com.snake.helper.ProxyActivity$P3
+  activity       com.snake.helper.ProxyActivity$P3_L
+  activity       com.snake.helper.TransparentProxyActivity$P0
+  activity       com.snake.helper.TransparentProxyActivity$P1
+  activity       com.snake.helper.TransparentProxyActivity$P2
+  activity       com.snake.helper.TransparentProxyActivity$P3
+  activity       com.snake.helper.ProxyPendingActivity$P0
+  activity       com.snake.helper.ProxyPendingActivity$P1
+  activity       com.snake.helper.ProxyPendingActivity$P2
+  activity       com.snake.helper.ProxyPendingActivity$P3
+  service        com.snake.helper.ProxyService$P0
+  service        com.snake.helper.ProxyService$P1
+  service        com.snake.helper.ProxyService$P2
+  service        com.snake.helper.ProxyService$P3
+  provider       com.snake.helper.ProxyContentProvider$P0
+  provider       com.snake.helper.ProxyContentProvider$P1
+  provider       com.snake.helper.ProxyContentProvider$P2
+  provider       com.snake.helper.ProxyContentProvider$P3
+  service        com.snake.helper.ProxyJobService$P0
+  service        com.snake.helper.ProxyJobService$P1
+  service        com.snake.helper.ProxyJobService$P2
+  service        com.snake.helper.ProxyJobService$P3
+  receiver       com.google.android.gms.measurement.AppMeasurementReceiver
+  service        com.google.android.gms.measurement.AppMeasurementService
+  service        com.google.android.gms.measurement.AppMeasurementJobService
+  activity       com.google.android.gms.common.api.GoogleApiActivity
+  provider       com.google.firebase.provider.FirebaseInitProvider
+  provider       androidx.startup.InitializationProvider
+  service        com.google.android.datatransport.runtime.backends.TransportBackendDiscovery
+  service        com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService
+  receiver       com.google.android.datatransport.runtime.scheduling.jobscheduling.AlarmManagerSchedulerBroadcastReceiver
+  receiver       androidx.profileinstaller.ProfileInstallReceiver
+
+--- meta-data ---
+  io.flutter.embedding.android.NormalTheme = @0x7f110138
+  flutterEmbedding = 2
+  com.google.android.gms.cloudmessaging.FINISHED_AFTER_HANDLED = true
+  com.google.firebase.components:com.google.firebase.messaging.FirebaseMessagingKtxRegistrar = com.google.firebase.components.ComponentRegistrar
+  com.google.firebase.components:com.google.firebase.messaging.FirebaseMessagingRegistrar = com.google.firebase.components.ComponentRegistrar
+  com.google.firebase.components:com.google.firebase.analytics.connector.internal.AnalyticsConnectorRegistrar = com.google.firebase.components.ComponentRegistrar
+  com.google.firebase.components:com.google.firebase.installations.FirebaseInstallationsKtxRegistrar = com.google.firebase.components.ComponentRegistrar
+  com.google.firebase.components:com.google.firebase.installations.FirebaseInstallationsRegistrar = com.google.firebase.components.ComponentRegistrar
+  com.google.firebase.components:com.google.firebase.ktx.FirebaseCommonLegacyRegistrar = com.google.firebase.components.ComponentRegistrar
+  com.google.firebase.components:com.google.firebase.FirebaseCommonKtxRegistrar = com.google.firebase.components.ComponentRegistrar
+  com.google.firebase.components:com.google.firebase.datatransport.TransportRegistrar = com.google.firebase.components.ComponentRegistrar
+  android.support.FILE_PROVIDER_PATHS = @0x7f130000
+  android.support.FILE_PROVIDER_PATHS = @0x7f130000
+  android.net.VpnService.SUPPORTS_ALWAYS_ON = true
+  androidx.emoji2.text.EmojiCompatInitializer = androidx.startup
+  androidx.lifecycle.ProcessLifecycleInitializer = androidx.startup
+  androidx.profileinstaller.ProfileInstallerInitializer = androidx.startup
+  com.google.android.gms.version = @0x7f090008
+  backend:com.google.android.datatransport.cct.CctBackendFactory = cct

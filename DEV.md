@@ -70,10 +70,10 @@ init() →
   2. ServiceBinderProxy.init()   # 8 system service hook
   3. (ArtHookEngine removed in V3 — was no-op)
   4. (StringObfuscator removed in V3 — was orphan)
-  5. SandboxManager.init()        # bootstrap vision/ + ELF stubs
+  5. SandboxManager.init()        # bootstrap root/ (dataDir/root) + ELF stubs
   6. Flagger.init()               # tamper state bitset
   7. (Phase 3.3) RemoteConfig.fetchRemoteAsync()  # offline
-  8. (Phase 3.1) Engine.nativeHydratePayloads()  # if 92 files in vision/files/
+  8. (Phase 3.1) Engine.nativeHydratePayloads()  # if payloads in root/files/
   9. CrashHandler.install()       # local file only
  10. AetherDaemonService.start()   # FGS pidof loop
 ```
@@ -149,3 +149,18 @@ See [TESTING.md](TESTING.md) for details.
 | **Total** | **81** | **9,300** |
 
 (Removed in V3: 738 LOC of orphan code — StringObfuscator.kt 320 + ArtHookEngine.kt 418)
+
+## Gates (local — รันก่อนขอประกอบเสมอ)
+| gate | ตรวจ | fail mode |
+|---|---|---|
+| `scripts/preflight.sh` | รวมทั้งหมดด้านล่าง + YAML/manifest/brace | exit≠0 |
+| `scripts/full_compile.sh` | compile **ทั้ง 3 โมดูล** ด้วย android.jar 35 จริง (≡ CI compileDebugKotlin) | unresolved reference |
+| `scripts/jni_parity.py` | Engine.kt ↔ table 1:1 incl. descriptor + **dead-fun guard** (C3) | mismatch |
+| `scripts/native_chain_parity.py` | T1 F2 ↔ sig/table/call-site placement (ic/i/ac; D6/D7=WARN) | hop ขาด |
+| `scripts/structural_gates.py` | S1 orphan-TU · S2 manifest↔MAX_SLOTS · S3 NO-OP marker (C5/C7/C4) | เขียวหลอก |
+| `scripts/evidence_check.sh` | T1 vendored + UNVERIFIED declared (C10/C16) | อ้างลอย |
+| `scripts/wire_contract_check.py` | W1 const-only literals · W2 bundle keys single-source · W3 Dart↔Kotlin types | schema แยกร่าง |
+| `aether-android/test-stubs/run-aether-test.sh` | JVM unit 4 เคส (รวม C11 seam success path) | assertion |
+
+กติกา (audit round 2): **ห้าม push/สั่ง CI โดยไม่ได้รับอนุญาตเป็นรายครั้ง** — local gates
+ต้องเขียวครบก่อน แล้วสรุป diff ให้ผู้ใช้ตรวจ → ขอ permission → push ครั้งเดียว

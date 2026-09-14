@@ -1,0 +1,86 @@
+=== F2 classes.dex ===
+sha256=e2b1fb586a9a85b4f094340458ea350eb1faafd602b8a4a287d4b3b97297af11
+classes=5448  method_ids=34990  strings=20037
+native declarations: 54 (13 custom + 41 Flutter engine)
+
+--- custom native methods (the interesting ones) ---
+
+  CLASS Lcom/snake/helper/Native;      JNI name: com/snake/helper/Native      11 native method(s)
+    native (Ljava/lang/Object;Ljava/lang/Object;)V ac
+        expected static JNI export : Java_com_snake_helper_Native_ac
+        exported by                : NOBODY -> must be bound via RegisterNatives
+    native (Ljava/lang/String;Ljava/lang/String;)V aior
+        expected static JNI export : Java_com_snake_helper_Native_aior
+        exported by                : NOBODY -> must be bound via RegisterNatives
+    native (Ljava/lang/String;)V awl
+        expected static JNI export : Java_com_snake_helper_Native_awl
+        exported by                : NOBODY -> must be bound via RegisterNatives
+    native ([B)Z chl
+        expected static JNI export : Java_com_snake_helper_Native_chl
+        exported by                : NOBODY -> must be bound via RegisterNatives
+    native (I)[B djp
+        expected static JNI export : Java_com_snake_helper_Native_djp
+        exported by                : NOBODY -> must be bound via RegisterNatives
+    native ()V eio
+        expected static JNI export : Java_com_snake_helper_Native_eio
+        exported by                : NOBODY -> must be bound via RegisterNatives
+    native (I)V i
+        expected static JNI export : Java_com_snake_helper_Native_i
+        exported by                : NOBODY -> must be bound via RegisterNatives
+    native (Landroid/content/Context;)V ic
+        expected static JNI export : Java_com_snake_helper_Native_ic
+        exported by                : NOBODY -> must be bound via RegisterNatives
+    native (I)Ljava/lang/String; ilil
+        expected static JNI export : Java_com_snake_helper_Native_ilil
+        exported by                : NOBODY -> must be bound via RegisterNatives
+    native (Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)V pjowqpxe
+        expected static JNI export : Java_com_snake_helper_Native_pjowqpxe
+        exported by                : NOBODY -> must be bound via RegisterNatives
+    native (Ljava/lang/Object;Ljava/lang/reflect/Method;)V update
+        expected static JNI export : Java_com_snake_helper_Native_update
+        exported by                : NOBODY -> must be bound via RegisterNatives
+
+  CLASS Lcom/snake/helper/flagger;      JNI name: com/snake/helper/flagger      2 native method(s)
+    native ()V na
+        expected static JNI export : Java_com_snake_helper_flagger_na
+        exported by                : NOBODY -> must be bound via RegisterNatives
+    native ()V nb
+        expected static JNI export : Java_com_snake_helper_flagger_nb
+        exported by                : NOBODY -> must be bound via RegisterNatives
+
+--- Flutter engine native declarations (implemented by libflutter.so) ---
+  Lio/flutter/embedding/engine/FlutterJNI;: 41 native methods; 0 resolved by libflutter.so exports; unresolved: ['nativeAttach', 'nativeCleanupMessageData', 'nativeDeferredComponentInstallFailure', 'nativeDestroy', 'nativeDispatchEmptyPlatformMessage', 'nativeDispatchPlatformMessage', 'nativeDispatchPointerDataPacket', 'nativeDispatchSemanticsAction', 'nativeFlutterTextUtilsIsEmoji', 'nativeFlutterTextUtilsIsEmojiModifier', 'nativeFlutterTextUtilsIsEmojiModifierBase', 'nativeFlutterTextUtilsIsRegionalIndicator', 'nativeFlutterTextUtilsIsVariationSelector', 'nativeGetBitmap', 'nativeGetIsSoftwareRenderingEnabled', 'nativeImageHeaderCallback', 'nativeInit', 'nativeInvokePlatformMessageEmptyResponseCallback', 'nativeInvokePlatformMessageResponseCallback', 'nativeLoadDartDeferredLibrary', 'nativeLookupCallbackInformation', 'nativeMarkTextureFrameAvailable', 'nativeNotifyLowMemoryWarning', 'nativeOnVsync', 'nativePrefetchDefaultFontManager', 'nativeRegisterImageTexture', 'nativeRegisterTexture', 'nativeRunBundleAndSnapshotFromLibrary', 'nativeScheduleFrame', 'nativeSetAccessibilityFeatures', 'nativeSetSemanticsEnabled', 'nativeSetViewportMetrics', 'nativeSpawn', 'nativeSurfaceChanged', 'nativeSurfaceCreated', 'nativeSurfaceDestroyed', 'nativeSurfaceWindowChanged', 'nativeUnregisterTexture', 'nativeUpdateDisplayMetrics', 'nativeUpdateJavaAssetManager', 'nativeUpdateRefreshRate']
+
+--- library loader call sites ---
+  @classes.dex+0x2b6c2e   Ljava/lang/System;->loadLibrary(Ljava/lang/String;)V
+      enclosing method : Lcom/snake/App;-><clinit>()V
+      library name     : 'engine'    (resolved via fill-array-data+String([B))
+      evidence         : fill-array-data instruction at file 0x2b6c22 points to the payload at 0x2b6c38 (ident=0x0300, element_width=1, size=6); the 6 bytes at 0x2b6c40 are 656e67696e65 = 'engine'
+  @classes.dex+0x2bafda   Ljava/lang/System;->loadLibrary(Ljava/lang/String;)V
+      enclosing method : Lio/flutter/embedding/engine/FlutterJNI;->loadLibrary()V
+      library name     : 'flutter'    (resolved via const-string)
+      evidence         : const-string "flutter" at file 0x2bafd6 in Lio/flutter/embedding/engine/FlutterJNI;->loadLibrary()V
+
+--- Java-side callers of the custom native classes ---
+  Lcom/snake/helper/Native;: 20 distinct caller method(s)
+      <- Landroidx/appcompat/view/menu/b8;->callActivityOnResume(Landroid/app/Activity;)V   @0xed930
+      <- Landroidx/appcompat/view/menu/jv0;->O2(Ljava/lang/String;Ljava/lang/String;)V   @0x1b06d0
+      <- Landroidx/appcompat/view/menu/ne0;->run()V   @0x17f438
+      <- Landroidx/appcompat/view/menu/p60;->uncaughtException(Ljava/lang/Thread;Ljava/lang/Throwable;)V   @0x1626fc
+      <- Landroidx/appcompat/view/menu/vx;->b(Ljava/lang/String;JZ)V   @0x14324e
+      <- Landroidx/appcompat/view/menu/vx;->c(JILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V   @0x143344
+      <- Landroidx/appcompat/view/menu/vx;->c(JILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V   @0x14335c
+      <- Landroidx/appcompat/view/menu/vx;->c(JILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V   @0x14339e
+      <- Landroidx/appcompat/view/menu/vx;->c(JILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V   @0x1433f2
+      <- Landroidx/appcompat/view/menu/vx;->f(Landroid/app/Activity;Ljava/lang/String;IJZ)V   @0x14348e
+      <- Landroidx/appcompat/view/menu/vx;->f(Landroid/app/Activity;Ljava/lang/String;IJZ)V   @0x14349c
+      <- Landroidx/appcompat/view/menu/yu0;->f(Landroid/content/Context;Landroidx/appcompat/view/menu/wb;)V   @0x1b3598
+      <- Landroidx/appcompat/view/menu/yu0;->f(Landroid/content/Context;Landroidx/appcompat/view/menu/wb;)V   @0x1b35d6
+      <- Landroidx/appcompat/view/menu/z10;->a(Ljava/lang/String;)V   @0x1573c4
+      <- Landroidx/appcompat/view/menu/z10;->b(Ljava/lang/String;Ljava/lang/String;)V   @0x157436
+      <- Landroidx/appcompat/view/menu/z10;->c(Landroid/content/Context;)V   @0x157930
+      <- Lcom/Entry;->C(Landroidx/appcompat/view/menu/id0;Landroidx/appcompat/view/menu/kd0$d;)V   @0x292228
+      <- Lcom/snake/helper/Native;->a(Landroid/app/Activity;Ljava/lang/String;IJZ)V   @0x2b911c
+      <- Lcom/snake/helper/Native;->logIn(Ljava/lang/String;J)V   @0x2b914e
+      <- Lio/flutter/view/TextureRegistry$SurfaceTextureEntry;->setOnTrimMemoryListener(Lio/flutter/view/TextureRegistry$b;)V   @0x38e7ec
+  Lcom/snake/helper/flagger;: 0 distinct caller method(s)
