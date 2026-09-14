@@ -1,4 +1,4 @@
-// jni_hook.hpp — JNIEnv Function-Table Hooking (NATIVE_LOGIC.md §A) — ตรวจ novalid
+// jni_hook.hpp — JNIEnv Function-Table Hooking (NATIVE_LOGIC(transcript สูญ-UNVERIFIED) §A) — ตรวจ novalid
 // ต้นแบบ: 0x8f614 hook GetMethodID + CallObjectMethod{,V,A} 4 จุด เพื่อสกัด loadClass
 #pragma once
 #include <jni.h>

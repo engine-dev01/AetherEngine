@@ -57,7 +57,7 @@ app/             # Flutter shell
 - `aether_core.cpp` exports 35 `Java_com_aether_Engine_*`
 - **Pre-flight G3** verifies 1:1 parity (must match exactly)
 
-### Hook chain (NATIVE_LOGIC §A)
+### Hook chain (NATIVE_LOGIC(UNVERIFIED) §A)
 - `GetMethodID` (index 33) → cache `loadClass` jmethodID
 - `CallObjectMethod{,V,A}` (indices 34-36) → custom `loadClass` redirect
 - Self-guard via magic header `0xA37E2C5F1B8D4E69`

@@ -12,7 +12,7 @@
 > ทั้งหมดในเอกสารนี้ **ผูกเฉพาะ 8BP build 56.23.2** — เปลี่ยน version
 > เกมเมื่อไหร่ ต้อง regenerate ทุกช่อง.
 
-ทุกค่าในเอกสารนี้ตรวจจาก byte จริงในไฟล์ (ไม่ใช่จาก REPORT.md/DATA_DUMP.md
+ทุกค่าในเอกสารนี้ตรวจจาก byte จริงในไฟล์ (ไม่ใช่จาก REPORT(transcript สูญ-UNVERIFIED, 2026-09-09)/DATA_DUMP(transcript สูญ-UNVERIFIED)
 ซึ่งพบว่าคลาดเคลื่อนบางจุด — ดู §7).
 
 ---
@@ -142,9 +142,9 @@ permissions (`android.permission.*`, 11 รายการ):
 
 | ที่ | เอกสารเดิมเขียน | ค่าจริง (นับ/คำนวณ) |
 |---|---|---|
-| `DATA_DUMP.md §4.1` | 92 payloads | **85** (`files/[64-hex]`) |
-| `REPORT.md §4.1` | `.text` 8.18 MB | **7.8 MB** (0x52150–0x81eeac = 8,179,036 B) |
-| `REPORT.md §3.2` | Application class scan | ต้อง parse UTF-8 body (string-scan UTF-16 อย่างเดียวไม่เจอ) |
+| `DATA_DUMP(transcript สูญ-UNVERIFIED) §4.1` | 92 payloads | **85** (`files/[64-hex]`) |
+| `REPORT(transcript สูญ-UNVERIFIED, 2026-09-09) §4.1 ( เอกสารรอบก่อน ไม่ได้ commit — ค่าตรวจซ้ำจาก F4b)` | `.text` 8.18 MB | **7.8 MB** (0x52150–0x81eeac = 8,179,036 B) |
+| `REPORT(transcript สูญ-UNVERIFIED, 2026-09-09) §3.2 (ไม่ได้ commit — UNVERIFIED ดู reference/README.md)` | Application class scan | ต้อง parse UTF-8 body (string-scan UTF-16 อย่างเดียวไม่เจอ) |
 
 ## 8. Provisioning checklist (ต่อ target+version)
 

@@ -1,4 +1,4 @@
-// key_store.hpp — jkl_key 30-byte blob (DATA_DUMP.md §4.3)
+// key_store.hpp — jkl_key 30-byte blob (DATA_DUMP(transcript สูญ-UNVERIFIED) §4.3)
 // ต้นแบบ: 010100640100000000000000000100001400000000006464000000000100
 // โครง: [version:4][flags:4][...][...][0x14][0x6464][0x00][0x0100]
 #pragma once

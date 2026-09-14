@@ -4,7 +4,7 @@ import android.content.Intent
 import android.util.Log
 
 /**
- * IntentParser — jl0 (REPORT §3.3 + §7.6)
+ * IntentParser — jl0 (REPORT(UNVERIFIED) §3.3 + §7.6)
  *  a(Intent) -> ตรวจ action แล้ว dispatch ไป proxy ที่ถูกต้อง
  */
 object IntentParser {

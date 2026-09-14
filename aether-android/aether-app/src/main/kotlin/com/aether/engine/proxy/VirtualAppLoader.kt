@@ -6,7 +6,8 @@ import android.content.pm.ApplicationInfo
 import android.util.Log
 
 /**
- * VirtualAppLoader — port of prototype `jv0.O2()` (REPORT.md §7.2).
+ * VirtualAppLoader — port of prototype `jv0.O2()` (reference/NATIVE_CALLSITE_MAP.md
+ * §3 ขั้น E; T1 caller-class proof: reference/snake/F2_dex_natives.txt jv0@0x1b06d0).
  *
  * Loads the *target* application's `Application` object INTO the host process
  * (com.aether) so the guest runs virtualized, instead of the host merely

@@ -113,7 +113,7 @@ object VirtualAppContainer {
         // 3. Register redirect rules into native (only in virtual-target mode).
         //    Path rules: forward VirtualFS map → Engine.addIORule so native IO
         //    layer resolves guest paths into the sandbox.
-        //    Class rules: seed the loadClass registry (NATIVE_LOGIC.md §B) so
+        //    Class rules: seed the loadClass registry (NATIVE_LOGIC(transcript สูญ-UNVERIFIED) §B) so
         //    JniHook custom_loadClass can redirect guest class lookups.
         if (isVirtualTarget()) {
             registerNativeRules()

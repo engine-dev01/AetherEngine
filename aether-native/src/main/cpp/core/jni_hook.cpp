@@ -1,4 +1,4 @@
-// jni_hook.cpp — JNIEnv table hook 4 จุด (NATIVE_LOGIC.md §A)
+// jni_hook.cpp — JNIEnv table hook 4 จุด (NATIVE_LOGIC(transcript สูญ-UNVERIFIED) §A)
 // ต้นแบบ libengine_2.so: 0x8f614 archive .bss @0x8285F0 แล้ว patch indices 33-36
 // Aether: portable trampoline แบบ documented — ไม่ทำ mmap RWX/JIT (ต่างจากต้นแบบ)
 // Hook เฉพาะ loadClass เพื่อ class-map redirection (core/class_map)
@@ -32,7 +32,7 @@ static bool g_installed = false;
 // ถ้า origTable ถูก clobber โดย lib อื่น magic หาย → restore invalid → return false
 static constexpr uintptr_t kHookMagic = 0xA37E2C5F1B8D4E69ULL;
 
-// ต้นแบบ strings (NATIVE_LOGIC.md §A.2)
+// ต้นแบบ strings (NATIVE_LOGIC(transcript สูญ-UNVERIFIED) §A.2)
 static constexpr const char* kLoadClassName = "loadClass";
 static constexpr const char* kLoadClassSig  = "(Ljava/lang/String;)Ljava/lang/Class;";
 

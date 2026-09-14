@@ -22,7 +22,7 @@ print("  OK 13 custom natives across", len(per), "classes")
 PY
 [ $? -eq 0 ] || fail=$((fail+1))
 echo "=== [EC3] UNVERIFIED doc refs are declared ==="
-for d in DATA_DUMP.md NATIVE_LOGIC.md; do
+for d in "DATA_DUMP" "NATIVE_LOGIC"; do
   # บทเรียน: BusyBox grep ไม่ซัพ --include → false negative; ใช้ find|xargs
   refs=$(find . -type f \( -name '*.kt' -o -name '*.cpp' -o -name '*.md' -o -name '*.hpp' \) 2>/dev/null | grep -v '/build/' | xargs grep -l "$d" 2>/dev/null | wc -l)
   note=$(grep -c "$d" reference/README.md 2>/dev/null)

@@ -7,6 +7,6 @@
 | NATIVE_CALLSITE_MAP.md | **T2** (jadx transcript) | citation ใน kotlin comments (a7.java:171 ฯลฯ) | ตัวเลขบรรทัด jadx **ไม่ใช่ T1** — ใช้อ้างตำแหน่ง hop, ห้ามใช้ออกแบบสิ่งที่ไม่ปรากฏใน F2 (เช่น gcuid — ไม่มีใน T1 ใด ๆ) |
 | packageconf.8bp-56.23.2.json | T2 (ผล parse package.conf) | SandboxManager reference format | |
 
-หมายเหตุ C10-missing-evidence: DATA_DUMP.md / NATIVE_LOGIC.md = เอกสารรอบก่อน
+หมายเหตุ C10-missing-evidence: DATA_DUMP(transcript สูญ-UNVERIFIED) / NATIVE_LOGIC(transcript สูญ-UNVERIFIED) = เอกสารรอบก่อน
 ที่ไม่ได้ commit — ทุก citation ที่อ้างเอกสารเหล่านี้ถือว่า **UNVERIFIED** จนกว่า
 จะมีหลักฐาน T1 รองรับ (ดู docs/CUTS.md ประกอบ)

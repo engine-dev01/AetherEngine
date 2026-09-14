@@ -10,7 +10,7 @@ import android.util.Log
 import org.json.JSONObject
 
 /**
- * OAuthFlow — vx (REPORT §3.3 + §7.3) — OAuth login inject
+ * OAuthFlow — vx (REPORT(UNVERIFIED) §3.3 + §7.3) — OAuth login inject
  *
  * Prototype: vx.f(activity,url,code,token,withResult) -> InternalWebBrowser
  *          -> redirect fragment "...&access_token=...&..." -> parse

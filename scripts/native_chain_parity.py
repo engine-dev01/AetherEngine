@@ -14,7 +14,6 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 _F2_CANDIDATES = [
     ROOT / "reference/snake/F2_dex_natives.txt",                     # vendored (committed)
     ROOT.parent / "codes/Codes/SnakeLogic/fragments/F2_dex_natives.txt",  # sibling bundle
-    pathlib.Path("/var/minis/workspace/codes/Codes/SnakeLogic/fragments/F2_dex_natives.txt"),
 ]
 import os as _os
 _env = _os.environ.get("SNAKELOGIC_F2")

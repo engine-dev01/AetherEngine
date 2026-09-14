@@ -1,4 +1,4 @@
-// class_map.hpp — Virtual class registry (NATIVE_LOGIC.md §B)
+// class_map.hpp — Virtual class registry (NATIVE_LOGIC(transcript สูญ-UNVERIFIED) §B)
 // ต้นแบบ: hash_lookup @0x8285B8 (SIMD hash + modulo + std::string::compare)
 // Aether: std::unordered_map<string,string> + same dotted→slashed contract
 #pragma once

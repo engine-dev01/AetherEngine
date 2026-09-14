@@ -7,7 +7,7 @@ import org.junit.Assert.*
  * Smoke test สำหรับ StringDecryptor (string_decryptor.cpp)
  * ทดสอบ logic ฝั่ง Kotlin ที่ mirror กับ C++ implementation
  *
- * Reference: NATIVE_LOGIC.md §C.2
+ * Reference: NATIVE_LOGIC(transcript สูญ-UNVERIFIED) §C.2
  *   key = 0x30261adb60b7b4f4
  *   per-byte: k = (key >> ((counter % 8) * 8)) & 0xFF ^ counter
  *   LCG rotate: key = key * 6364136223846793005 + 1  (ทุก 256 bytes)
@@ -75,7 +75,7 @@ class StrDecryptSmokeTest {
 
     @Test
     fun decrypt_is_printable_ascii_for_known_data() {
-        // DATA_DUMP §4: ciphertext 0xaf 0xa7 0xb3 ... → plaintext ควรเป็น "engine_2"
+        // DATA_DUMP(UNVERIFIED) §4: ciphertext 0xaf 0xa7 0xb3 ... → plaintext ควรเป็น "engine_2"
         // (เป็น string table entry ของ Aether's cipher; first 9 chars = "engine_2\0")
         // ค่านี้ derived จาก key + counter; ไม่ deterministic จาก random cipher
         // → skip test นี้ถ้า cipher ไม่ตรง — ใช้เป็น regression check เท่านั้น

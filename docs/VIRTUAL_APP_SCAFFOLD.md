@@ -5,7 +5,7 @@
 > ที่ปิด crash loop ด้วยการ **defer `onCreate`** + firewall guest thread.
 >
 > เอกสารนี้เป็น blueprint ก่อนแตะ ART/ActivityThread internals (stop-before-code).
-> อ้างอิงต้นแบบ `jv0.O2` (REPORT.md §7.2) + provisioning
+> อ้างอิงต้นแบบ `jv0.O2` (REPORT(transcript สูญ-UNVERIFIED, 2026-09-09) §7.2) + provisioning
 > [`PROVISIONING_8BP_56.23.2.md`](PROVISIONING_8BP_56.23.2.md).
 
 ## 1. สถานะปัจจุบัน (หลัง 8fb5f35b)
