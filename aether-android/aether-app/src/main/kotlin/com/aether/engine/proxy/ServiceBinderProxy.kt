@@ -95,6 +95,22 @@ object ServiceBinderProxy {
     private var overridePackage: String = ""
     private var originalPackage: String = ""
 
+    /**
+     * methods ที่ String arg = CALLER IDENTITY slot (ระบบตรวจ uid↔pkg) →
+     * guest→host ก่อน delegate; ทุก query ที่ pkg เป็น DATA key ส่ง guest ตรง.
+     * พิสูจน์จาก device log 13:01:48: SE ×3 families ตรงกับ list นี้พอดี
+     * (virtual PMS/AMS server-side P4/P5 จะค่อย ๆ โยกคำตอบกลับมาที่นี่)
+     */
+    private val CALLER_SPOOF_METHODS = setOf(
+        "registerReceiver", "registerReceiverWithFeature", "unregisterReceiver",
+        "getContentProvider", "getContentProviderExternal",
+        "getIntentSender", "getIntentSenderWithFeature",
+        "broadcastIntent", "broadcastIntentWithFeature",
+        "bindServiceInstance", "bindService", "bindIsolatedService",
+        "startService", "peekService",
+        "serviceCanBind", "bindBackupAgent",
+    )
+
     // ══════════════════════════════════════════
     //  Initialization
     // ══════════════════════════════════════════
@@ -524,18 +540,21 @@ object ServiceBinderProxy {
                     }
                 }
 
-                // Override package name ถ้ามี
-                val modifiedArgs = args?.map { arg ->
-                    if (arg is String && arg == originalPackage && overridePackage.isNotEmpty()) {
-                        overridePackage
-                    } else {
-                        arg
-                    }
-                }?.toTypedArray()
-
-                // SNAKE ob.invoke fallback = method.invoke(realIface, args) — delegate
-                // ตรงไปยัง IInterface ตัวจริง (ไม่ต้องแปลงเป็น binder/transact เอง)
-                method.invoke(realIface, *(modifiedArgs ?: emptyArray()))
+                // ★ SNAKE caller-contract (device 13:01:48.530): ระบบจริงตรวจ
+                // 'caller package ∈ process ของ uid' — process เราคือ com.aether
+                // (u0a756); op-package ที่เรา spoof เป็น guest ใน framework ทำให้
+                // caller-slot กลายเป็น guest = SE เสมอ (registerReceiverWithFeature
+                // ฆ่า EightBallPoolActivity.onCreate, getContentProvider ×10,
+                // getIntentSenderWithFeature) → caller-slot ต้องกลับเป็น HOST
+                // เฉพาะ whitelist — DATA query (getPackageInfo(guest) ฯลฯ) ส่งตรง
+                // ให้ real PMS คืนข้อมูลเกมจริง (version 4013 = ที่ guest SDK ต้องการ)
+                val effectiveArgs = if (method.name in CALLER_SPOOF_METHODS &&
+                    overridePackage.isNotEmpty()) {
+                    args?.map { arg ->
+                        if (arg is String && arg == overridePackage) originalPackage else arg
+                    }?.toTypedArray()
+                } else args
+                method.invoke(realIface, *(effectiveArgs ?: emptyArray()))
             } catch (e: java.lang.reflect.InvocationTargetException) {
                 // ★ logcat 00:31:20.797 (com.aether_1.zip): เดิม catch(e:Exception)
                 // กลืน InvocationTargetException (message=null) → คืน null →
@@ -574,18 +593,21 @@ object ServiceBinderProxy {
                     return emptyParceledListSlice()
                 }
                 
-                // Override package name ถ้ามี
-                val modifiedArgs = args?.map { arg ->
-                    if (arg is String && arg == originalPackage && overridePackage.isNotEmpty()) {
-                        overridePackage
-                    } else {
-                        arg
-                    }
-                }?.toTypedArray()
-
-                // SNAKE ob.invoke fallback = method.invoke(realIface, args) — delegate
-                // ตรงไปยัง IInterface ตัวจริง (ไม่ต้องแปลงเป็น binder/transact เอง)
-                method.invoke(realIface, *(modifiedArgs ?: emptyArray()))
+                // ★ SNAKE caller-contract (device 13:01:48.530): ระบบจริงตรวจ
+                // 'caller package ∈ process ของ uid' — process เราคือ com.aether
+                // (u0a756); op-package ที่เรา spoof เป็น guest ใน framework ทำให้
+                // caller-slot กลายเป็น guest = SE เสมอ (registerReceiverWithFeature
+                // ฆ่า EightBallPoolActivity.onCreate, getContentProvider ×10,
+                // getIntentSenderWithFeature) → caller-slot ต้องกลับเป็น HOST
+                // เฉพาะ whitelist — DATA query (getPackageInfo(guest) ฯลฯ) ส่งตรง
+                // ให้ real PMS คืนข้อมูลเกมจริง (version 4013 = ที่ guest SDK ต้องการ)
+                val effectiveArgs = if (method.name in CALLER_SPOOF_METHODS &&
+                    overridePackage.isNotEmpty()) {
+                    args?.map { arg ->
+                        if (arg is String && arg == overridePackage) originalPackage else arg
+                    }?.toTypedArray()
+                } else args
+                method.invoke(realIface, *(effectiveArgs ?: emptyArray()))
             } catch (e: java.lang.reflect.InvocationTargetException) {
                 // แบบเดียวกับ handlePackageCall: ให้ caller เห็น cause จริง
                 Log.w(TAG, "Shortcut proxy rethrow ${method.name}: " +
@@ -616,18 +638,21 @@ object ServiceBinderProxy {
                     return null // Return null แทนที่จะ throw
                 }
                 
-                // Override package name ถ้ามี
-                val modifiedArgs = args?.map { arg ->
-                    if (arg is String && arg == originalPackage && overridePackage.isNotEmpty()) {
-                        overridePackage
-                    } else {
-                        arg
-                    }
-                }?.toTypedArray()
-
-                // SNAKE ob.invoke fallback = method.invoke(realIface, args) — delegate
-                // ตรงไปยัง IInterface ตัวจริง (ไม่ต้องแปลงเป็น binder/transact เอง)
-                method.invoke(realIface, *(modifiedArgs ?: emptyArray()))
+                // ★ SNAKE caller-contract (device 13:01:48.530): ระบบจริงตรวจ
+                // 'caller package ∈ process ของ uid' — process เราคือ com.aether
+                // (u0a756); op-package ที่เรา spoof เป็น guest ใน framework ทำให้
+                // caller-slot กลายเป็น guest = SE เสมอ (registerReceiverWithFeature
+                // ฆ่า EightBallPoolActivity.onCreate, getContentProvider ×10,
+                // getIntentSenderWithFeature) → caller-slot ต้องกลับเป็น HOST
+                // เฉพาะ whitelist — DATA query (getPackageInfo(guest) ฯลฯ) ส่งตรง
+                // ให้ real PMS คืนข้อมูลเกมจริง (version 4013 = ที่ guest SDK ต้องการ)
+                val effectiveArgs = if (method.name in CALLER_SPOOF_METHODS &&
+                    overridePackage.isNotEmpty()) {
+                    args?.map { arg ->
+                        if (arg is String && arg == overridePackage) originalPackage else arg
+                    }?.toTypedArray()
+                } else args
+                method.invoke(realIface, *(effectiveArgs ?: emptyArray()))
             } catch (e: Exception) {
                 Log.w(TAG, "Usage stats proxy call failed: ${e.message}")
                 null // ปลอดภัย: คืนค่า null เสมอ
