@@ -30,16 +30,18 @@ set(AETHER_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/core/jni_hook.cpp
     ${CMAKE_CURRENT_LIST_DIR}/core/class_map.cpp
     ${CMAKE_CURRENT_LIST_DIR}/core/string_decryptor.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/core/env_check.cpp
     ${CMAKE_CURRENT_LIST_DIR}/core/key_store.cpp
     ${CMAKE_CURRENT_LIST_DIR}/core/payload_store.cpp
 )
 
 # Layer 1 — Mirror Sandbox (virtual filesystem / manifest snapshot)
+# audit C5: manifest_snapshot/hide_module = orphan TUs ที่ gc-sections ทิ้ง
+#  - virtual_fs.cpp ต่อกับ JNI แล้ว (enableIO/addIORule/nativeResolvePath)
+#  - manifest_snapshot: ผู้ผลิต package.conf ตัวจริงคือ Kotlin generatePackageConf
+#    (per-install) — C++ duplicate ไม่มี call-site → ตัด (docs/CUTS.md)
+#  - hide_module: เขียน /data/adb/magisk/denylist = ต้อง root + ไม่มี caller → ตัด
 set(L1_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/layer/bindmount/virtual_fs.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/layer/packageconf/manifest_snapshot.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/layer/rootspoof/hide_module.cpp
 )
 
 # Vendored compression (LZ4, Aether-aligned) — C source

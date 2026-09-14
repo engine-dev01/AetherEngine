@@ -22,4 +22,13 @@ object Engine {
 
     @JvmStatic
     fun nativeSetSeed(seed: Int) { /* no-op */ }
+
+    @JvmStatic
+    fun nativeResolvePath(path: String): String? = null
+
+    @JvmStatic
+    fun nativeIORuleCount(): Int = 0
+
+    @JvmStatic
+    fun nativeExemptHiddenApi(): Boolean = false
 }

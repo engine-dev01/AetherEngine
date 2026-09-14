@@ -57,6 +57,20 @@ class AetherApp : Application() {
             Log.e(TAG, "Failed to load native engine: ${e.message}")
         }
 
+        // audit C6: hidden-API exemption ครั้งเดียวต่อ process — ก่อนทุก hook/reflection
+        // (chain ยิง restricted members ~20 จุด; เดิมไม่มี exemption ใดใน repo →
+        //  NoSuchField/Method เงียบ ๆ ใน runCatching = boot chain พังแบบมองไม่เห็น)
+        try {
+            val ok = com.aether.Engine.nativeExemptHiddenApi()
+            Log.i(TAG, "hidden-API exemption: $ok")
+        } catch (t: Throwable) {
+            Log.w(TAG, "hidden-API exemption failed: ${t.message}")
+        }
+
+        // audit C2: DiagLog ต้องพร้อมบน main ด้วย (readResult ใน EngineBridge อ่าน
+        // ไฟล์เดียวกัน; เดิม init มีแต่ใน ProxyActivity/:pN)
+        try { com.aether.engine.proxy.DiagLog.init(this) } catch (_: Throwable) {}
+
         // hop17 ≡ SNAKE Native.ic ที่ yu0.f() หลัง loadLibrary — Main+Child เท่านั้น
         // (T1: F2 sig (Landroid/content/Context;)V · T2: server ไม่เรียก ic)
         run {
@@ -104,7 +118,8 @@ class AetherApp : Application() {
             val payloadDir = java.io.File(dataDir, "root/files")
             val jklHex = "010100640100000000000000000100001400000000006464000000000100"  // DATA_DUMP §4.3
             val count = com.aether.Engine.nativeHydratePayloads(payloadDir.absolutePath, jklHex)
-            Log.i(TAG, "nativeHydratePayloads: $count payloads loaded from ${filesDir.absolutePath}")
+            // audit C13-hydrate-log: log must name the dir actually scanned
+            Log.i(TAG, "nativeHydratePayloads: $count payloads loaded from ${payloadDir.absolutePath}")
         } catch (t: Throwable) {
             Log.w(TAG, "nativeHydratePayloads: ${t.message}")
         }

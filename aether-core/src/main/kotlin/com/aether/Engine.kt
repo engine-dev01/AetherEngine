@@ -22,15 +22,10 @@ object Engine {
 
     // ─── Native bridge (11 core methods) ───
     external fun nativeCompute(input: Int): ByteArray?                  // compute — main algorithm
-    external fun nativeValidate(data: ByteArray): Boolean                // validate
-    external fun nativeExchangeKeys(s1: String?, s2: String?)               // exchangeKeys
-    external fun nativeWriteLog(msg: String?)                            // writeLog
-    external fun nativeDeriveKey(seed: Int): String?                     // deriveKey
     external fun nativeProcessPair(o1: Any?, o2: Any?)                       // processPair
     external fun nativeProcessTriple(o1: Any?, o2: Any?, o3: Any?)      // processTriple
     external fun nativeReflectUpdate(obj: Any?, method: java.lang.reflect.Method?) // reflectUpdate
     external fun nativeInitContext(context: android.content.Context?)        // initContext
-    external fun nativeEntropy(): Long                                   // entropy
     external fun nativeSetSeed(seed: Int)                                  // setSeed
 
     // ══════════════════════════════════════════
@@ -38,8 +33,6 @@ object Engine {
     // ══════════════════════════════════════════
     external fun nativeOffset(): Long                      // Native offset discovery
     external fun nativeOffset2(): Long                     // Secondary offset discovery
-    external fun setAccessible(field: java.lang.reflect.Field)  // Bypass Java access control
-    external fun setAccessible(method: java.lang.reflect.Method)
     external fun setBinderCallingPidOverride(newPid: Int): Int    // Override Binder PID
     external fun setBinderCallingUidOverride(newUid: Int): Int    // Override Binder UID
     external fun restoreBinderCallingPidOverride(oldPid: Int)     // Restore PID
@@ -48,22 +41,20 @@ object Engine {
     // ══════════════════════════════════════════
     //  Phase 4: String Encryption (native decryptor)
     // ══════════════════════════════════════════
-    external fun decryptString(key: Long, args: Array<String>?): String?  // KOS native decryptor
 
     // ══════════════════════════════════════════
     //  Phase 5: Network IO + HideXposed + DEX Loading
     // ══════════════════════════════════════════
     external fun enableIO()                                   // Enable IO virtualization
     external fun addIORule(path: String, redirect: String)    // Add virtual FS rule
-    external fun hideXposed()                                 // Hide Xposed/Magisk
-    external fun installNetworkHttpProbe()                    // Install HTTP interceptor
-    external fun loadEmptyDex(): LongArray?                   // Load empty DEX for hot-reload
+    external fun nativeResolvePath(path: String): String?     // native VirtualFS resolve (round-2: self-test ผ่าน native จริง)
+    external fun nativeIORuleCount(): Int                     // จำนวน rule ที่ native ถืออยู่จริง
+    external fun nativeExemptHiddenApi(): Boolean             // VMRuntime.setHiddenApiExemptions(["L"]) — audit C6
 
     // ══════════════════════════════════════════
     //  Phase 3.1+3.2 — Payload hydration + decrypt (DATA_DUMP §4)
     // ══════════════════════════════════════════
     external fun nativeHydratePayloads(dirPath: String, jklHex: String): Int   // loadDir + return count
-    external fun nativeDecryptPayloadByHash(sha256hex: String, jklKey: ByteArray): ByteArray?  // decrypt 1 payload
 
     // ══════════════════════════════════════════
     //  Phase 3.5.D — class-map registry (NATIVE_LOGIC.md §B)
