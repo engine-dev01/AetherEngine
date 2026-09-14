@@ -90,6 +90,13 @@
         <activity android:name="com.aether.engine.proxy.ProxyActivity$P1" android:exported="true" android:process=":p1" />
         <activity android:name="com.aether.engine.proxy.ProxyActivity$P2" android:exported="true" android:process=":p2" />
         <activity android:name="com.aether.engine.proxy.ProxyActivity$P3" android:exported="true" android:process=":p3" />
+        <!-- audit C7 (F3 parity): base stub ตัวจริง (r1.w() ยิงเมื่อไม่ใช้ slot) -->
+        <activity android:name="com.aether.engine.proxy.ProxyActivity" android:exported="true" />
+        <!-- landscape stubs ≡ ProxyActivity$Pn_L (F3; orientation=0 + pip) -->
+        <activity android:name="com.aether.engine.proxy.ProxyActivity$P0_L" android:exported="true" android:process=":p0" android:screenOrientation="landscape" android:supportsPictureInPicture="true" android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden" />
+        <activity android:name="com.aether.engine.proxy.ProxyActivity$P1_L" android:exported="true" android:process=":p1" android:screenOrientation="landscape" android:supportsPictureInPicture="true" android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden" />
+        <activity android:name="com.aether.engine.proxy.ProxyActivity$P2_L" android:exported="true" android:process=":p2" android:screenOrientation="landscape" android:supportsPictureInPicture="true" android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden" />
+        <activity android:name="com.aether.engine.proxy.ProxyActivity$P3_L" android:exported="true" android:process=":p3" android:screenOrientation="landscape" android:supportsPictureInPicture="true" android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden" />
 
         <!-- TransparentProxyActivity (Aether-compatible) (:p0–:p3) -->
         <activity android:name="com.aether.engine.proxy.TransparentProxyActivity$P0" android:exported="true" android:process=":p0" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
