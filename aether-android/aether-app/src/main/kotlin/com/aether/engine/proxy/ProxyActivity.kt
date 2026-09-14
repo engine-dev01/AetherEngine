@@ -305,7 +305,18 @@ open class ProxyActivity : Activity() {
             // รวม main thread — ต้อง chain ให้ prev (system default) เพื่อ
             // process ตายจริง + มี tombstone/dropbox ให้ diagnosis (01:18
             // mystery-disappearance ที่ crashed:false จะไม่มองไม่เห็นอีก)
-            val benign = e is SecurityException && !isMain
+            // device proof 17:07:01.266 (round-3): whitelist ปิด caller-slot SE ครบ
+            // (0 rethrow families) → SE ที่เหลือ = GMS broker protocol (m7.*
+            // dynamite measurement ส่งชื่อ guest ให้ com.google.android.gms ตรวจ
+            // กับ PMS จริง — ไม่ใช่ระบบ service ของเราจึง spoof ที่ proxy ไม่ได้)
+            // และมัน dispatch บน MAIN looper ของ guest SDK ≡ เคสนinja ที่ blueprint
+            // D5 ระบุให้ไหลเป็น benign — swallow + report; เคสนอก family นี้ chain ตาม C15
+            val gmsFamily = e.stackTrace.any { st ->
+                val c = st.className
+                c.startsWith("m7.") || c.startsWith("com.google.android.gms") ||
+                c.startsWith("com.google.firebase") || c.startsWith("bb.")
+            }
+            val benign = e is SecurityException && (!isMain || gmsFamily)
             if (!benign && prev != null) {
                 DiagLog.d("ProxyActivity", "firewall CHAIN→prev: ${e.javaClass.name} main=$isMain")
                 try { prev.uncaughtException(t, e) } catch (_: Throwable) { }
