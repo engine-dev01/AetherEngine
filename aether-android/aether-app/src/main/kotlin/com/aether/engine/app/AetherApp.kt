@@ -91,15 +91,13 @@ class AetherApp : Application() {
         // Initialize core managers (each wrapped in Throwable — never let a
         // single subsystem crash the whole app at launch)
         // SandboxManager.init(this) called by AetherOrchestrator.init() — no duplicate
-        // Phase 3.5: โหลด data เข้าที่เก็บ sandbox (virtual root /root/ ตาม blueprint)
-        try {
-            // Phase 1+2: real package is "com.aether" (host applicationId).
-            // Old "com.aether.aether" was wrong — broadcast/queries/data-dir mismatch
-            // caused daemon to silently never reach its own receiver.
-            SandboxManager.bootstrapGameData("com.aether")
-        } catch (e: Exception) {
-            Log.e(TAG, "Sandbox bootstrap error: ${e.message}")
-        }
+        //
+        // T1 (com.snake.zip = ดัมป์ต้นแบบตอน *เปิดแอพ* 13:17): sandbox ว่างเปล่า
+        // (root/{cache,data,data/app,system} = dir เปล่า, ไม่มี package.conf/token/conf
+        //  ใด ๆ) — engine ไม่ fabricate อะไรตอนเปิด ทุกอย่างเกิดตอน *กดเริ่มเกม*
+        // (bootstrapGameData(targetPkg) ใน launchInSandbox) และ guest เขียนเอง
+        // เดิมเรียก bootstrapGameData("com.aether") ที่นี่ = สร้าง package.conf ของ
+        // host + token ปลอมตอนเปิด (ผิดต้นแบบ + ไฟล์ผีที่ไม่มี consumer) → ตัด
         try { Flagger.init(this) } catch (t: Throwable) { Log.e(TAG, "Flagger.init: ${t.message}") }
         try { RemoteConfig.init(this) } catch (t: Throwable) { Log.e(TAG, "RemoteConfig.init: ${t.message}") }
 
@@ -112,11 +110,11 @@ class AetherApp : Application() {
             Log.w(TAG, "RemoteConfig.fetchRemoteAsync: ${t.message}")
         }
 
-        // Phase 3.1: hydrate payload store จาก root/files/ (DATA_DUMP §4 — 92 SHA-256 named)
+        // Phase 3.1: hydrate payload store จาก root/files/ (DATA_DUMP(UNVERIFIED) §4 — 92 SHA-256 named)
         // เดิม provisionPayloadsFromFiles count อย่างเดียว → เปลี่ยนเป็นเรียก native loadDir
         try {
             val payloadDir = java.io.File(dataDir, "root/files")
-            val jklHex = "010100640100000000000000000100001400000000006464000000000100"  // DATA_DUMP §4.3
+            val jklHex = "010100640100000000000000000100001400000000006464000000000100"  // DATA_DUMP(UNVERIFIED) §4.3
             val count = com.aether.Engine.nativeHydratePayloads(payloadDir.absolutePath, jklHex)
             // audit C13-hydrate-log: log must name the dir actually scanned
             Log.i(TAG, "nativeHydratePayloads: $count payloads loaded from ${payloadDir.absolutePath}")

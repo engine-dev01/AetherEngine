@@ -27,8 +27,8 @@ import java.security.SecureRandom
  *   │   ├── files/ shared_prefs/ databases/ cache/ no_backup/ code_cache/
  *   │   ├── app_textures/ app_webview_0:.../
  *   ├── data/user_de/0/<pkg>/
- *   ├── proc/0/cmdline                     ← fake (ชี้ไป pkg)
- *   └── system/uid.conf, user.conf, shared-user.conf
+ *   ├── proc/0/                            ← engine เขียนเมื่อ virtual-UID พร้อม
+ *   └── system/                            ← ว่างตอนเปิด (≡ T1 com.snake.zip)
  */
 object SandboxManager {
 
@@ -130,7 +130,16 @@ object SandboxManager {
         // sandbox root อยู่ที่ dataDir root ตรง:
         //   /data/user/0/com.aether/root   (ไม่ใช่ .../files/root)
         sandboxRoot = File(context.dataDir, "root")
-        sandboxRoot?.mkdirs()
+        // T1 (com.snake.zip = ต้นแบบตอนเปิดแอพ): root/{cache,data,data/app,system}
+        // มีอยู่จริงเป็น dir ว่าง — engine สร้างโครงเปล่าไว้, ไฟล์ทุกตัวถูกเขียน
+        // ตอน runtime เท่านั้น (ไม่ใช่ fabricated stub)
+        sandboxRoot?.apply {
+            mkdirs()
+            java.io.File(this, "cache").mkdirs()
+            java.io.File(this, "data").mkdirs()
+            java.io.File(this, "data/app").mkdirs()
+            java.io.File(this, "system").mkdirs()
+        }
         // [CUT 2026-09-11] spoofRootEnvironment — resetprop/magiskpolicy
         // (ปลอม env root/debuggable/secure) ทำให้แอพกั๊กตัวเอง งดก่อนทดสอบ
         // spoofRootEnvironment()
@@ -265,9 +274,10 @@ object SandboxManager {
         File(root, "data/app/$targetPkg").mkdirs()
         // data/user_de
         File(root, "data/user_de/0/$targetPkg").mkdirs()
-        // fake /proc + /system
-        File(root, "proc/0").mkdirs()
+        // /system conf dir: ≡ T1 (com.snake.zip: root/system ว่างตอนเปิด)
+        // /proc: ไม่สร้างตอนเปิด — จะมาพร้อม virtual-UID (P4+) ที่มี parser จริง
         File(root, "system").mkdirs()
+        File(root, "cache").mkdirs()   // ≡ T1: root/cache ว่าง (snake สร้าง cache ใต้ virtual root)
         return pkgDir
     }
 
@@ -415,11 +425,12 @@ object SandboxManager {
             //    path ทำให้เกมเขียนลง sandbox เอง (SNAKE dump พิสูจน์: ไฟล์เกม
             //    ใน sandbox ต้นแบบ = เกมสร้างตอน runtime)
 
-            // 5. fake /proc + /system
-            File(root, "proc/0/cmdline").writeText(targetPkg)
-            File(root, "system/uid.conf").writeText("# AetherEngine virtual UID conf\n")
-            File(root, "system/user.conf").writeText("# AetherEngine virtual user conf\n")
-            File(root, "system/shared-user.conf").writeText("# AetherEngine virtual shared-user conf\n")
+            // 5. fake /proc + /system — T1 (com.snake.zip ดัมป์ตอนเปิดแอพ 13:17):
+            //    ต้นแบบมีแค่ root/{cache,data,data/app,system} เป็น dir ว่าง;
+            //    ไม่มี proc/** และไม่มี *.conf ใด ๆ ตอนเปิด — ของเก่าที่เขียน here
+            //    (cmdline + uid/user/shared-user) = fabrication ไร้ consumer (grep
+            //    ยืนยัน: ไม่มีโค้ดอ่าน) → ตัด; จะกลับมาพร้อม virtual-UID (P4+)
+            //    เมื่อมี parser ที่อ่านจริง ≡ x6/y6 ฝั่งต้นแบบ
 
             android.util.Log.i(TAG, "Sandbox bootstrapped at ${root.absolutePath} (pkg=$targetPkg)")
         } catch (e: Exception) {
