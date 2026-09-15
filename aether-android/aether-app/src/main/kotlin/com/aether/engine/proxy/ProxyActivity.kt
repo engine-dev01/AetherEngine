@@ -144,6 +144,14 @@ open class ProxyActivity : Activity() {
                     loadReason = "launcher not resolved from manifest/conf"
                 } else {
                 stage = "guest-load"
+                // ── P4 ≡ snake hop18: HCallbackProxy ที่ mH.mCallback ก่อน bind ──
+                // (blueprint: "ติดตั้ง my.java semantics ที่ :pN ก่อน installProviders")
+                // armed = ระยะเวลา load; transaction อื่น (guest SDK startActivity
+                // ซ้อน) ถูก hold แล้ว 放行 หลัง bind — bootstrap message ปัจจุบัน
+                // ไม่ถูก hold (dispatch อยู่ = ยังไม่ arm ตอนรับ message)
+                val hcbOk = HCallbackProxy.install()
+                HCallbackProxy.arm()
+                DiagLog.d("ProxyActivity", "HCallbackProxy install=$hcbOk armed (≡my@t1.g)")
                 // S1 currentApplication + S2 providers + S3 onCreate.
                 // Step 3: migrate to GuestRuntimeBridge (v2 compat layer).
                 // Bridge delegates to v2 (GuestRuntime) with auto-fallback to v1.
@@ -164,6 +172,10 @@ open class ProxyActivity : Activity() {
                     "source=${res.runtimeSource} providers=${res.providersInstalled}/${gm.providers.size} " +
                     "guestCL=${res.guestClassLoader != null} " +
                     "metrics=${res.metrics.totalLoadMs}ms fallback=${res.metrics.fallbackTriggered}")
+                // P4/hop19: bind จบ (สำเร็จหรือล้ม) → 放行 transaction ที่ hold;
+                // ล้ม = ปล่อยคืนระบบตามเดิม (ห้ามกิน message ของ framework)
+                HCallbackProxy.finishBind()
+                DiagLog.d("ProxyActivity", HCallbackProxy.status())
 
                 // Scaffold-4: install Instrumentation hook so a guest-targeted
                 // startActivity is retargeted to THIS stub (ProxyActivity$P0) and
@@ -216,6 +228,8 @@ open class ProxyActivity : Activity() {
             } catch (e: Throwable) {
                 stage = "guest-load"
                 loadReason = "${e.javaClass.simpleName}: ${e.message}"
+                // ปล่อย message ที่ hold คืนระบบเสมอ (ห้ามค้างใน queue ของ framework)
+                runCatching { HCallbackProxy.finishBind() }
                 DiagLog.err("ProxyActivity", "guest launch exception", e)
             }
             // dump full process logcat (framework + our traces) for post-mortem.
@@ -272,6 +286,8 @@ open class ProxyActivity : Activity() {
             // ของ instance เก่า... บน API บางรุ่นเรียก — guard ด้วย isFinishing)
             runCatching { GuestProcessHolder.reset() }
             runCatching { AetherInstrumentation.reset() }
+            // P4: ถอด mCallback คืน prev + ล้าง queue (session จบจริงเท่านั้น)
+            runCatching { HCallbackProxy.reset() }
         }
         super.onDestroy()
     }

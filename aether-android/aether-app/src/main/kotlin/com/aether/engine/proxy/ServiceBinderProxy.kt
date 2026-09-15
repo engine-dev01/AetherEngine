@@ -1,5 +1,6 @@
 package com.aether.engine.proxy
 
+import android.content.Intent
 import android.os.IBinder
 import android.os.IInterface
 import android.util.Log
@@ -574,8 +575,49 @@ object ServiceBinderProxy {
         }
 
         private fun handleActivityCall(method: Method, args: Array<out Any>?): Any? {
-            // Override package ใน ActivityManager calls
+            // ── hook A ที่ binder layer (blueprint P4 ≡ VirtualApp; ปิด C9 ของเดิม
+            // ที่ตายเพราะ subclass override ของ execStartActivity ไม่เคย dispatch) ──
+            // guest เรียก startActivity(เกม-class) จากใน :pN → ระบบจริง route ออก
+            // ไปแอปจริง/SE → rewrite component เป็น stub ของ slot *นี้* ก่อนส่ง
+            // พร้อม stash EXTRA_GUEST_CLASS/INTENT ให้ newActivity (AetherInstrumentation
+            // hook B) สลับกลับเป็นคลาสเกม — ปลายทาง ≡ il0.b() ซ่อน real intent
+            // ใน stub (T2 hop15) ภายใต้ key ภายในของเรา (B4 — endpoint ฝั่งเราทั้งคู่)
+            val activityish = method.name.startsWith("startActivity") ||
+                method.name.startsWith("startActivities") ||
+                method.name == "startActivityAsUser"
+            if (activityish && overridePackage.isNotEmpty() && args != null) {
+                rewriteGuestIntents(args)
+            }
+            // Override package ใน ActivityManager calls (caller-slot ≡ host)
             return handlePackageCall(method, args)
+        }
+
+        /**
+         * แปลง Intent ทุกตัวใน arg list (รวม Intent[]) ที่ component เป็น guest
+         * → stub P<slot> ของ process นี้; ห้าม rewrite ตัวที่ชี้ host/stub อยู่แล้ว
+         * หรือไม่มี component (implicit intent — ปล่อยระบบresolve)
+         */
+        private fun rewriteGuestIntents(args: Array<out Any?>) {
+            runCatching {
+                val slot = GuestProcessHolder.config?.slot ?: 0
+                val stub = "com.aether.engine.proxy.ProxyActivity\$P$slot"
+                fun one(i: android.content.Intent?) {
+                    val c = i?.component ?: return
+                    if (c.packageName != overridePackage) return
+                    if (c.className == stub) return
+                    if (i.getStringExtra(AetherInstrumentation.EXTRA_GUEST_CLASS) != null) return
+                    i.putExtra(AetherInstrumentation.EXTRA_GUEST_CLASS, c.className)
+                    i.putExtra(AetherInstrumentation.EXTRA_GUEST_INTENT, c.packageName)
+                    i.setClassName(originalPackage, stub)
+                    Log.i(TAG, "hookA binder-rewrite: ${c.className} → $stub (slot $slot)")
+                }
+                args.forEach { a ->
+                    when (a) {
+                        is android.content.Intent -> one(a)
+                        is Array<*> -> a.forEach { if (it is android.content.Intent) one(it) }
+                    }
+                }
+            }.onFailure { Log.w(TAG, "hookA rewrite skipped: ${it.message}") }
         }
 
         private fun handleShortcutCall(method: Method, args: Array<out Any>?): Any? {

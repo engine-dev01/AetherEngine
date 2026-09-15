@@ -385,6 +385,8 @@ object EngineBridge : MethodCallHandler {
         // hop2: sCache wrappers ติดตั้งจริงกี่ key (ใน process ที่ bridge รัน = main)
         sb.append("[2] ${com.aether.engine.proxy.ServiceBinderProxy.sCacheVerify()}\n")
         sb.append("[2b] proxies=${com.aether.engine.proxy.ServiceBinderProxy.listProxiedServices().size}\n")
+        // hop7 (P4): HCallbackProxy ทำงานเฉพาะ :pN — main เห็น installed=false = ถูก
+        sb.append("[3h] ${com.aether.engine.proxy.HCallbackProxy.status()}\n")
         // hop3: AMS singleton (ของจริงเป็น BinderProxy — ของเราเป็น java Proxy)
         sb.append("[3] ")
         sb.append(try {
