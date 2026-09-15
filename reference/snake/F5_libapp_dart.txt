@@ -1,0 +1,123 @@
+=== F5 binaries/libapp.so (Dart AOT snapshot) ===
+sha256   : 2d3577fbaaacc7cb63e5b04a5a21572eeee1e0d55b223941d6a5496a91a427c8
+build-id : 63956a450772e13c10d2440539822110
+strings  : 11118 ASCII runs >= 5 chars
+
+--- snapshot version records ---
+  file offset 0x214  va 0x214  inside _kDartVmSnapshotData
+      version  : 80a49c7111088100a233b2ae788e1f48
+      features : product no-code_comments dwarf_stack_traces_mode dedup_instructions no-tsan no-msan arm64 android compressed-pointers
+  file offset 0x40d4  va 0x40d4  inside _kDartIsolateSnapshotData
+      version  : 80a49c7111088100a233b2ae788e1f48
+      features : product no-code_comments dwarf_stack_traces_mode dedup_instructions no-tsan no-msan arm64 android compressed-pointers
+
+--- Dart snapshot entry symbols ---
+  _kDartIsolateSnapshotData = 0x40c0
+  _kDartIsolateSnapshotInstructions = 0x176b40
+  _kDartSnapshotBuildId = 0x1c8
+  _kDartVmSnapshotData = 0x200
+  _kDartVmSnapshotInstructions = 0x160000
+
+--- sections ---
+  .note.gnu.build-id       addr=0x1c8        size=32         exec=False write=False
+  .rodata                  addr=0x200        size=1394112    exec=False write=False
+  .eh_frame                addr=0x1547c0     size=66         exec=False write=False
+  .dynstr                  addr=0x154808     size=133        exec=False write=False
+  .dynsym                  addr=0x154890     size=144        exec=False write=False
+  .hash                    addr=0x154920     size=56         exec=False write=False
+  .text                    addr=0x160000     size=4178912    exec=True write=False
+  .bss                     addr=0x560000     size=32         exec=False write=True
+  .dynamic                 addr=0x560020     size=96         exec=False write=True
+  .shstrtab                addr=0x0          size=90         exec=False write=False
+
+--- indicator counts ---
+  auth_token     6
+  brand          2
+  c2_endpoint    2
+  license        3
+  social_link    4
+  store_link     2
+  url            5
+  version_lock   3
+
+--- hosts referenced ---
+  imgur.com                                    4
+  api.flutter.dev                              2
+  www.facebook.com                             1
+  flagsapi.com                                 1
+  wa.me                                        1
+  apkpure.com                                  1
+  www.snakeengine.com                          1
+  t.me                                         1
+  rest.snakeseller.com                         1
+  flutter.dev                                  1
+  play.google.com                              1
+  discord.com                                  1
+
+--- indicators ---
+  [auth_token  ] 0x03ac57  Access Token
+  [auth_token  ] 0x02cb84  ENCRYPTED_SIZE
+  [auth_token  ] 0x01f0eb  access token
+  [auth_token  ] 0x0408d1  authorization
+  [auth_token  ] 0x043ce3  deviceId
+  [auth_token  ] 0x0427c0  encryptedData
+  [brand       ] 0x02bfe4  Snake Engine
+  [brand       ] 0x03bd3a  com.snake
+  [c2_endpoint ] 0x043fe5  https://rest.snakeseller.com/api/request/
+  [c2_endpoint ] 0x03d50e  https://www.snakeengine.com/topup/
+  [license     ] 0x01d5df  decompressLicenses
+  [license     ] 0x02a9f6  parseLicenses
+  [license     ] 0x04e765  utf8DecodeLicenses
+  [social_link ] 0x04e123  https://discord.com/invite/
+  [social_link ] 0x0402c9  https://t.me/
+  [social_link ] 0x03376c  https://wa.me/
+  [social_link ] 0x01f56d  https://www.facebook.com/
+  [store_link  ] 0x039902  https://apkpure.com/search?q=
+  [store_link  ] 0x04ba7b  https://play.google.com/store/apps/details?id=
+  [url         ] 0x03ea1c  https://api.flutter.dev/flutter/dart-ui/ChannelBuffers-class.html
+  [url         ] 0x034eaf  https://api.flutter.dev/flutter/material/Scaffold/of.html
+  [url         ] 0x02c611  https://flagsapi.com/
+  [url         ] 0x049149  https://flutter.dev/docs/release/breaking-changes/network-policy-ios-android.
+  [url         ] 0x01d1a5  https://imgur.com/
+  [version_lock] 0x0423da  currently supported version
+  [version_lock] 0x023a0d  not OFFCIAL
+  [version_lock] 0x01c5be  not supported
+
+--- cross-language identity: Java identifiers inside the Dart snapshot ---
+  probed 8 identifiers derived from AndroidManifest.xml and
+  from the ACC_NATIVE class declarations in classes.dex:
+    miss Lcom/snake/helper/Native;          not present
+    miss Lcom/snake/helper/flagger;         not present
+    HIT  com.snake                          0x3bd3a
+    miss com.snake.helper.Native            not present
+    miss com.snake.helper.flagger           not present
+    miss com/snake                          not present
+    miss com/snake/helper/Native            not present
+    miss com/snake/helper/flagger           not present
+
+  Dart-side strings naming the app/Java helper surface (token: snake|helper):
+    0x2bfe4    You are not connected to the internet, Snake Engine needs an active internet connection
+    0x3387f    Hindi ka konektado sa internet, kailangan ng Snake Engine ng aktibong koneksyon sa internet
+    0x3ae49    Snake Engine
+    0x3bd3a    com.snake
+    0x3d50e    https://www.snakeengine.com/topup/
+    0x4343a    helperError
+    0x43fe5    https://rest.snakeseller.com/api/request/
+    0x444f5    s conectado a Internet, Snake Engine necesita una conexi
+    0x49900    Anda tidak disambungkan ke internet, Snake Engine memerlukan sambungan internet yang aktif
+
+--- engine C++ API names referenced by this snapshot ---
+  11 distinct PlatformConfigurationNativeApi::* references;
+  these are resolved against libflutter.so at run time, so every one of them
+  must exist in the engine that is shipped next to this snapshot (see F6).
+    PlatformConfigurationNativeApi::DefaultRouteName               at 0x35285
+    PlatformConfigurationNativeApi::EndWarmUpFrame                 at 0x1bbb9
+    PlatformConfigurationNativeApi::GetRootIsolateToken            at 0x3bc6d
+    PlatformConfigurationNativeApi::Render                         at 0x489da
+    PlatformConfigurationNativeApi::RequestDartPerformanceMode     at 0x2cc51
+    PlatformConfigurationNativeApi::RespondToPlatformMessage       at 0x3291a
+    PlatformConfigurationNativeApi::ScheduleFrame                  at 0x1d0d7
+    PlatformConfigurationNativeApi::SendChannelUpdate              at 0x23e4d
+    PlatformConfigurationNativeApi::SendPlatformMessage            at 0x404fc
+    PlatformConfigurationNativeApi::SetNeedsReportTimings          at 0x1c083
+    PlatformConfigurationNativeApi::UpdateSemantics                at 0x32be6

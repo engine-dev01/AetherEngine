@@ -1,0 +1,54 @@
+=== F1 apks/SNAKE.apk ===
+sha256            : f847608605ea1da9a7452f2072ee59e4dc26a900ca2aad0315c967c9c896d561
+members           : 997
+zip integrity     : OK (testzip found no bad member)
+
+--- native libraries inside the APK ---
+  lib/arm64-v8a/libapp.so   size=5637024   sha256=2d3577fbaaacc7cb63e5b04a5a21572eeee1e0d55b223941d6a5496a91a427c8
+  lib/arm64-v8a/libengine.so   size=8544568   sha256=f5d751e6bde8f0595eda9836338e845b029a41d2362743a2a4619ba99f41e3be
+  lib/arm64-v8a/libflutter.so   size=10714752   sha256=0baa710d6b7f7de2f8bcc05aa2950bab2989f3a4c95bc7f7bcc23ce84626ee52
+
+--- provenance: APK member vs the loose copy committed in this repo ---
+  lib/arm64-v8a/libapp.so
+      apk  : 2d3577fbaaacc7cb63e5b04a5a21572eeee1e0d55b223941d6a5496a91a427c8  (5,637,024 bytes)
+      repo : 2d3577fbaaacc7cb63e5b04a5a21572eeee1e0d55b223941d6a5496a91a427c8  (5,637,024 bytes)  [binaries/libapp.so]
+      ->   MATCH
+  lib/arm64-v8a/libengine.so
+      apk  : f5d751e6bde8f0595eda9836338e845b029a41d2362743a2a4619ba99f41e3be  (8,544,568 bytes)
+      repo : f5d751e6bde8f0595eda9836338e845b029a41d2362743a2a4619ba99f41e3be  (8,544,568 bytes)  [binaries/libengine.so]
+      ->   MATCH
+  lib/arm64-v8a/libflutter.so
+      apk  : 0baa710d6b7f7de2f8bcc05aa2950bab2989f3a4c95bc7f7bcc23ce84626ee52  (10,714,752 bytes)
+      repo : 0baa710d6b7f7de2f8bcc05aa2950bab2989f3a4c95bc7f7bcc23ce84626ee52  (10,714,752 bytes)  [flutter_libs/libflutter.so]
+      ->   MATCH
+
+--- classes.dex ---
+  sha256=e2b1fb586a9a85b4f094340458ea350eb1faafd602b8a4a287d4b3b97297af11  size=3,881,048 bytes
+
+--- AndroidManifest.xml ---
+  sha256=3471243c394371496cfdab37eb7a2ccd33389612b221a39c51148267ef9440a0
+
+--- member groups ---
+  lib                  3 entries    24,896,344 bytes
+  (root)              29 entries     5,053,450 bytes
+  assets              16 entries     1,141,120 bytes
+  res                886 entries       384,484 bytes
+  META-INF            56 entries       189,188 bytes
+  kotlin               7 entries        28,940 bytes
+
+--- flutter_assets (excluding fonts) ---
+  assets/flutter_assets/AssetManifest.bin   489 bytes   sha256=79179b123d6a4d3744f91620bbdb7ef11f19f03927efd6517d7d4c2949506c83
+  assets/flutter_assets/AssetManifest.json   425 bytes   sha256=e5da2e2ae67961cb869a55e4990662d0259844541a36fa62600e81b3a97d91ce
+  assets/flutter_assets/FontManifest.json   379 bytes   sha256=ef4230d24d9110ff16757ce9574b22aa81e7258c17b3d14ce68c4efc898d0279
+  assets/flutter_assets/NOTICES.Z   85609 bytes   sha256=190cfe6cf06e2477f5eba7c8e0380b33b54e71deede58e6eb5d60b974dadf91b
+  assets/flutter_assets/assets/discord.svg   884 bytes   sha256=263a0bb777a4c45b2a271cb00086e67a51ea5831632097a662f6ec9ba4cd14b2
+  assets/flutter_assets/assets/facebook.svg   809 bytes   sha256=191f40615c1209a5299d8b1a1a34f71469e0d00eef9a2b331b9f5233a700d773
+  assets/flutter_assets/assets/link.svg   2331 bytes   sha256=b4c55c86feabe8c6969911f49aa60d559ea23f386272f591b4157e85facdfabc
+  assets/flutter_assets/assets/telegram.svg   1055 bytes   sha256=e0bab5cbfaa0092d527552083190a071b8a6a8ddc75b9b69ba9376ff9a0429f1
+  assets/flutter_assets/assets/whatsapp.svg   1314 bytes   sha256=3b02d33bafb251ac94bfeab192d391cc7fd0d1b462748a37ee3e0b85a775e25d
+  assets/flutter_assets/shaders/ink_sparkle.frag   17304 bytes   sha256=3aa09424d1dc391fd59a9735efe986ff43302b5e5bc310926afe11c68626c3b2
+
+--- signing material ---
+  META-INF/CERT.RSA   1374 bytes   sha256=1822664da4f95280b269276b9dc6b874018b693a4716454318372afa0a640108
+  META-INF/CERT.SF   93696 bytes   sha256=735783a35253fb9f034228312b39681316cbc0e4f931af6b334129f2060dcb57
+  META-INF/MANIFEST.MF   93622 bytes   sha256=3c86ec0526521aa2b1c8c93b9bb4c1902bf10721dfa98b37e6370733b3259c35

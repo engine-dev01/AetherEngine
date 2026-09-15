@@ -52,10 +52,13 @@ object Engine {
     // ══════════════════════════════════════════
     external fun nativeHydratePayloads(dirPath: String, jklHex: String): Int   // loadDir + return count
 
-    // ══════════════════════════════════════════
-    //  Phase 3.5.D — class-map registry (NATIVE_LOGIC(transcript สูญ-UNVERIFIED) §B)
-    //  Feeds the loadClass redirect table (JniHook custom_loadClass).
-    // ══════════════════════════════════════════
+    // ─── Version support (8 Ball Pool) ───
+    // Evidence: reference/BOOT_LINKAGE.md SP-01 / call_linkage.json CH-12
+    // Endpoint and response-key are pinned from SNAKE T5 pool (pp+0x139d8/0x139f8)
+    const val ENDPOINT_URL = "https://rest.snakeseller.com/api/request/"
+    const val ENDPOINT_ACTION = "?action=upload_profile_image"
+    const val RESPONSE_KEY_SUCCESS = "success"
+    const val RESPONSE_KEY_DATA = "data"
     external fun addClassRule(dottedRequested: String, slashedTarget: String)  // register redirect
     external fun clearClassRules()                                             // clear registry
     external fun classRuleCount(): Int                                         // active rule count

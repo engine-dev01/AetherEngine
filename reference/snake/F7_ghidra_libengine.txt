@@ -1,0 +1,82 @@
+=== F7 Ghidra 12.1.2 headless analysis of libengine.so (third-party artifact) ===
+sha256(evidence_ghidra.zip) : 068b00bcced11b52ab9234b1343d3b6187f725fd7a65442bdb9e9e78e1a6e12e
+analyzed                    : output/libengine_jni/{00_INDEX, 01_JNI_OnLoad.c,
+                              02_init_array_entries, 03_init_array_decompiles/,
+                              04_JNI_OnLoad_callgraph, 05_RegisterNatives_xrefs,
+                              06_Java_strings}, output/libengine.so.log,
+                              output/symbols/libengine.so.{sections,symbols,strings}.txt
+
+--- 1. coordinate system: MEASURED, not assumed ---
+  Ghidra places JNI_OnLoad at 0x1f3fa0; this repository's .dynsym says 0xf3fa0.
+  delta = 0x100000, taken from 46 anchors (JNI_OnLoad, the .init_array section address and all 44 slot addresses); every anchor gives the same value (consistent=True).
+  Ghidra addresses are quoted as-is below; subtract the delta to get file VAs.
+
+--- 2. 01_JNI_OnLoad.c (12,280 bytes of decompiled C) ---
+  svc sites (Ghidra renders them as CallSupervisor(0)) : 40
+  immediates staged before those svc                   : 0 x20, 222 x10   (0xde = 222 = mmap)
+  mmap() calls                                         : 10
+      prot values  = [7]   (7 = PROT_READ|WRITE|EXEC)
+      flags values = ['0x22']   (0x22 = MAP_PRIVATE|MAP_ANONYMOUS)
+      -> independent confirmation of F4c's 'allocates RWX anonymous memory'
+  lines storing a synthesised AArch64 B opcode         : 10
+      pattern '*pc = (pc & 0xfc000000) | 0x14000000' (0x14000000 appears 10x)
+      -> confirms the two static B-opcode writes F4 found at 0x000f3fa4 / 0x000f3fb0 and shows
+         the same runtime code-patching pattern is used far more widely
+  JNIEnv slot loads (RegisterNatives +0x6b8 / FindClass +0x30 / FromReflectedMethod +0x38) : 0 total {'0x6b8': 0, '0x30': 0, '0x38': 0}
+      -> the decompiler agrees JNI_OnLoad performs NO dynamic JNI registration
+  .bss globals touched : 27 -> 00110a70, 0012e890, 0012e8e8, 00928048, 00928050, 00928058 ...
+      rebased          : 0x10a70, 0x2e890, 0x2e8e8, 0x828048, 0x828050, 0x828058 ...
+      includes the DAT_00928048..088 block F4c identified as the 9-slot pointer table
+
+--- 3. 02_init_array_entries.txt (44 entries) ---
+  section as Ghidra sees it: addr=0x925c78 size=0x160 (44 pointers)
+  first: [0] 0x925c78 -> 0x21ab10 (_INIT_0) = ELF VA 0x11ab10
+  last : [43] 0x925dd0 -> 0x91ae24 (_INIT_43) = ELF VA 0x81ae24
+  CROSS-CHECK: after rebasing, 44 of Ghidra's 44 targets equal the 44 targets this
+  repository derived from .rela.dyn addends - two independent methods, one answer.
+
+--- 4. 03_init_array_decompiles/ (one file per constructor) ---
+  status counts: {'no function': 7, 'timeout': 37}
+  => 0 of 44 constructors decompiled successfully
+  Ghidra's invented names (sub_11AB10 ...) match this repository's targets, so both analyses agree on WHICH functions exist and both fail to disassemble them (see the 'obfuscated constructors' problem in LINKAGE.md)
+
+--- 5. 04_JNI_OnLoad_callgraph.txt (5 callees) ---
+  0x91f120 size=0x16 rand                 (ELF VA 0x81f120)
+  0x91ad58 size=0x148 FUN_0091ad58         (ELF VA 0x81ad58)
+  0x91eff0 size=0x16 __stack_chk_fail     (ELF VA 0x81eff0)
+  0x91f0e0 size=0x16 strlen               (ELF VA 0x81f0e0)
+  0x91f110 size=0x16 sysconf              (ELF VA 0x81f110)
+  -> no JNI registration helper among them
+
+--- 6. 05_RegisterNatives_xrefs.txt ---
+  content: (symbol not found)    xref lines: 0
+  -> no RegisterNatives symbol exists in the image at all; the same fact F3 reaches from the
+     byte level as 'zero JNI dynamic-registration call sites'
+
+--- 7. 06_Java_strings.txt ---
+  matching lines: 0  (EMPTY FILE)
+  -> Ghidra's automatic search for 'Java/' and 'Java_' strings found nothing either.
+     Independent corroboration that JNI class/method names are not plaintext here
+     (F5's finding that the interesting strings are encrypted).
+
+--- 8. output/libengine.so.log (355,578 bytes) ---
+  ERROR lines                 : 4,751
+  WARNING lines               : 0
+  'LSDACallSiteTable: error'  : 2,278  (C++ exception metadata)
+  unreachable blocks          : 7
+  jumptable failures          : 10
+  decompiler 'timeout' in log : 0 (the timeouts are reported in 03, not in the log)
+  -> Ghidra itself could not fully analyse this binary; every claim sourced from it is
+     labelled 'tool-corroborated' rather than 'byte-verified' in LINKAGE.md
+
+--- 9. output/symbols/ (readelf, shipped inside the same artifact) ---
+  sections: 26 names shared with this repository's pyelftools parse; 26 agree on addr+size; 0 appear in only one of the two
+  .mytext addr: readelf 0x81eeac vs ours 0x81eeac - identical, which proves the 0x100000 shift is Ghidra's image base, not a different binary
+  .dynsym: readelf reports 154 entries = 136 UNDEF + 17 DEFINED + 1 null; our parse counts 136 UNDEF + 17 DEFINED
+  strings: the `strings -n 8` artifact holds 886 runs; our own scan of the same file at min_len=8 finds 885
+      cause of the difference: GNU strings counts TAB (0x09) as printable, our [\x20-\x7e] scan does not
+      artifact runs containing TAB = 6; ours = 0
+      runs only the artifact reports = 0  -> we miss nothing
+      runs only we report = 5, of which 5 sit immediately beside a TAB byte (GNU strings joined them into the 6 TAB runs above)
+      (the same TAB difference was already recorded for the Dart-side string counts; see the string-count problem in LINKAGE.md)
+  defined symbols (first 8): _ZTCNSt6__ndk119basic_istrings, _ZTVNSt6__ndk119basic_istrings, _ZTVNSt6__ndk115basic_stringbu, _ZTTNSt6__ndk114basic_ifstream, _ZTTNSt6__ndk118basic_stringst, _ZTCNSt6__ndk119basic_ostrings, _ZTTNSt6__ndk119basic_ostrings, _ZTTNSt6__ndk119basic_istrings

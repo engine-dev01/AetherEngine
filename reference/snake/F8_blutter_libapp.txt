@@ -1,0 +1,139 @@
+=== F8 blutter 1.4.0 object-pool dump of libapp.so (third-party artifact) ===
+sha256(evidence_results.zip) : 75d5a2e77a538966342f1c5cd66f4a94aa60b33c177c22301c78309d668259ce
+analyzed                     : output/blutter/{pp.txt, objs.txt, blutter_frida.js, asm/*.dart}
+                               + the C2_*/VERSION_LOCK_* grep files committed beside them
+
+--- 1. scale ---
+  pp.txt   : 18,786 object-pool entries, 3,623 distinct string values
+  objs.txt : 19,568 object descriptions
+  asm/     : 672 disassembled Dart files
+  frida js : 210,024 bytes
+
+--- 2. joining our byte scan (F5) with blutter's object pool ---
+  each string F5 found in libapp.so is looked up in the pool; three verdicts are possible:
+    pool-exact     the pool holds this exact string object (both tools agree, two coordinates)
+    pool-embedded  the pool holds it inside a LONGER string (the two tools cut it differently)
+    pool-absent    it is a raw byte run in the snapshot, not an object-pool entry
+
+  category      string                                              pool verdict
+  [c2_endpoint] https://www.snakeengine.com/topup/           file 0x3d50e   pool-exact    pp+0x17790
+  [c2_endpoint] https://rest.snakeseller.com/api/request/    file 0x43fe5   pool-exact    pp+0x139d8
+  [social_link] https://www.facebook.com/                    file 0x1f56d   pool-exact    pp+0x17d90
+  [social_link] https://wa.me/                               file 0x3376c   pool-exact    pp+0x17d88
+  [social_link] https://t.me/                                file 0x402c9   pool-exact    pp+0x17d80
+  [social_link] https://discord.com/invite/                  file 0x4e123   pool-exact    pp+0x17d78
+  [url        ] https://imgur.com/                           file 0x1d1a5   pool-embedded pp+0x10c38 'If you have screen shots please upload to ht
+  [url        ] https://flagsapi.com/                        file 0x2c611   pool-exact    pp+0x17c88
+  [url        ] https://api.flutter.dev/flutter/material/Sca file 0x34eaf   pool-embedded pp+0x408 ' channel was discarded before it could be hand
+  [url        ] https://api.flutter.dev/flutter/dart-ui/Chan file 0x3ea1c   pool-embedded pp+0x408 ' channel was discarded before it could be hand
+  [url        ] https://flutter.dev/docs/release/breaking-ch file 0x49149   pool-embedded pp+0x130 '\\" is not supported by the platform. Refer to
+  [store_link ] https://apkpure.com/search?q=                file 0x39902   pool-embedded pp+0x178b0 'https://apkpure.com/search\\?q='
+  [store_link ] https://play.google.com/store/apps/details?i file 0x4ba7b   pool-embedded pp+0x178b8 'https://play.google.com/store/apps/details\\
+  [brand      ] Snake Engine                                 file 0x2bfe4   pool-exact    pp+0xf620
+  [brand      ] com.snake                                    file 0x3bd3a   pool-exact    pp+0xe458
+  [auth_token ] access token                                 file 0x1f0eb   pool-embedded pp+0x115c0 'This is your secure access token. Keep it sa
+  [auth_token ] ENCRYPTED_SIZE                               file 0x2cb84   pool-absent   
+  [auth_token ] Access Token                                 file 0x3ac57   pool-exact    pp+0x11508
+  [auth_token ] authorization                                file 0x408d1   pool-exact    pp+0xa640
+  [auth_token ] encryptedData                                file 0x427c0   pool-absent   
+  [auth_token ] deviceId                                     file 0x43ce3   pool-exact    pp+0x43c0
+
+  what the join changes:
+   - the 2 store links are pool objects with a REGEX-ESCAPED '?' (pp+0x178b0, pp+0x178b8): the Dart side holds them as patterns to match, not as links to open
+   - the 3 api.flutter.dev / flutter.dev URLs are pool-embedded inside Flutter's
+     own error text ('... channel was discarded before it could be handled ...'), so they
+     are FRAMEWORK doc links, not app endpoints. F5's category 'url' does not by itself
+     mean app-controlled; the pool context decides.
+   - imgur.com appears in 6 pool strings, all inside a user-facing support
+     sentence in several languages, e.g. 'If you have screen shots please upload to https://imgur.com/ and share l'
+     -> support text, not a data-exfiltration endpoint
+   - 2 strings are pool-ABSENT. Their raw byte neighbourhood shows what they
+     really are (Dart identifier strings in the snapshot's string table, not HTTP headers):
+       ENCRYPTED_SIZE   at file 0x2cb84: llbacks init:_TAd@430019562 ENCRYPTED_SIZE [A-Za-z0-9]+(
+       encryptedData    at file 0x427c0: _Pfc@227452173 encryptedData Terdapat r
+     -> this is why the artifact's own C2_headers.txt grep found 0 lines: 'clientAuth',
+        'apiToken', 'clientVersion' and 'signature' are obfuscated Dart identifiers, so
+        the C2-header hypothesis is NOT supported and is recorded as rejected.
+   - method-channel handlers really present in the one C2 library (3):
+       output/blutter/asm/Ieg.dart:379  class _dX  [closure] Future<dynamic> _pfc(dynamic, MethodCall) {
+       output/blutter/asm/Ieg.dart:468  class _hX  [closure] Future<bool> _cec(dynamic, MethodCall) {
+       output/blutter/asm/Ieg.dart:471  class _hX  [closure] Future<dynamic> _eec(dynamic, MethodCall) {
+
+--- 3. identity: three unrelated sources for one fact ---
+  blutter object pool : 'com.snake' at pp+0xe458
+  our byte scan (F5)  : 'com.snake' at libapp.so file offset 0x3bd3a
+  APK manifest (F3)   : package=com.snake
+  brand string        : 'Snake Engine' at pp+0xf620
+
+--- 4. self-inspection cluster (consecutive pool slots = one allocation run) ---
+  [pp+0xe428] Null: ''
+  [pp+0xe430] String: 'function result'
+  [pp+0xe438] AnonymousClosure: '(0x38af64), in [kkg] _ioa::<anonymous closure> (0x37fe90)'
+  [pp+0xe440] Field <Yoa.fne>: 'static late final (offset: 0xe70)'
+  [pp+0xe448] String: '/proc/self/maps'
+  [pp+0xe450] Field <toa.yle>: 'static late (offset: 0xe40)'
+  [pp+0xe458] String: 'com.snake'
+  [pp+0xe460] String: '([0-9a-f]+)-([0-9a-f]+)\\\\s+(\\\\S+)\\\\s+([0-9a-f]+)\\\\s+(\\\\w+):([0-9a-f]+)\\\\s+(\\\\d+)\\\\s+(.*)'
+  [pp+0xe468] String: "Failed to decode data using encoding \\'"
+  -> Dart code that opens /proc/self/maps and parses every line with that address-range
+     regex, with the package name two slots away. Pool adjacency is NOT a call graph; it is
+     evidence that one routine allocated them. blutter's asm/ output does not cover that
+     closure, so no cross-reference exists to confirm it.
+  Native-side parallels among libengine.so's imports: __system_property_get, dl_iterate_phdr, prctl, process_vm_readv
+
+--- 5. closure names: blutter's asm joined to the raw string table ---
+  blutter names each Dart closure `<name>@<libraryId>` in the snapshot's string table, so a
+  closure found in asm/ can be located as raw bytes - and the library id says which library
+  it really belongs to:
+    _pfc   asm Ieg.dart:379 (class _dX)  <->  raw '_pfc@286240726' at file 0x269c4
+    _cec   asm Ieg.dart:468 (class _hX)  <->  raw '_cec@122399801' at file 0x2ba08
+    _eec   asm Ieg.dart:471 (class _hX)  <->  raw '_eec@122399801' at file 0x3cdb5
+  library ids involved: 122399801, 286240726 -> the 3 handlers are spread over 2 Dart libraries
+  CASE-SENSITIVITY TRAP (checked, and NOT linked): the pool-absent string 'encryptedData'
+  sits next to `_Pfc@227452173` in the string table. Dart names are case-sensitive and
+  asm/Ieg.dart contains BOTH `_pfc(dynamic, MethodCall)` (line 379) and `_Pfc(dynamic, Ca)`
+  (line 440), with different library ids (286240726 vs 227452173). `encryptedData` therefore
+  belongs to the `_Pfc`/`Ca` closure, NOT to the MethodCall handler `_pfc`.
+
+--- 6. version-lock strings (12 grep hits in VERSION_LOCK_refs.txt) ---
+   only 2 of them are the app's own; the other 10 are Flutter framework
+   strings caught by the artifact's broad 'not supported' pattern:
+   APP       [pp+0x112e0] 'This game version is not supported. please install other version . from * to #'
+   APP       [pp+0x11310] 'The game you have installed is not OFFCIAL version. please install the official version from Google Play.'
+   framework [pp+0x130] '\\" is not supported by the platform. Refer to https://flutter.dev/docs/release/breaking-changes/network-policy-i'
+   framework [pp+0x338] 'Microtasks are not supported'
+   framework [pp+0x14c0] "\\'print\\' is not supported"
+   framework [pp+0x1c10] 'Timer interface not supported.'
+   framework ... 6 more
+   The native side has 2 flagger natives (flagger.na/nb) that nothing calls (F3). Pairing
+   them with these Dart strings is a HYPOTHESIS, recorded as a candidate link only.
+
+--- 7. CORRECTION: this artifact disproved one of our own earlier links ---
+  earlier claim : the pool string 'helperError' links to the Java class com/snake/helper/Native
+                  because it contains the substring 'helper'
+  blutter says  : enum member 0 of 11 in Obj!_WF (siblings: helperError, icon, input, prefixIcon, suffixIcon, prefix, suffix, label, hint, counter, container)
+  => it is Flutter's own _InputDecoratorState decoration slot, not a bridge to the app's
+     Java helper. The link was a substring false positive; it is removed from links.csv,
+     links.json and LINKAGE.md and replaced by a recorded problem. The method-channel claim
+     now rests only on asm/Ieg.dart's closures _pfc / _cec / _eec(dynamic, MethodCall).
+
+--- 8. which libapp.so did blutter actually parse? (answered by its build log) ---
+  pp.txt and objs.txt carry NO version string, so on their own the dump could not be tied
+  to any particular file. evidence_results.zip also contains blutter_build.log, and its
+  last lines state the identity of the snapshot that was parsed:
+    Dart version : 3.5.4
+    Snapshot     : 80a49c7111088100a233b2ae788e1f48
+    Target       : android arm64
+    flags        : product no-code_comments dwarf_stack_traces_mode dedup_instructions no-tsan no-msan arm64 android compressed-pointers
+    loaded at    : 0x7f913de00000   (Dart heap 0x7f9000000000)
+    blutter build: blutter_dartvm3.5.4_android_arm64  (1,063 log lines)
+
+  CROSS-CHECK against this repository's own parse of the committed bytes:
+    libapp.so     snapshot 80a49c7111088100a233b2ae788e1f48 at file 0x214 (features-adjacent)  -> MATCH
+    libapp.so     snapshot 80a49c7111088100a233b2ae788e1f48 at file 0x40d4 (features-adjacent)  -> MATCH
+    libflutter.so snapshot 80a49c7111088100a233b2ae788e1f48 at 0x1eafd4  -> MATCH
+    feature string: ours 'product no-code_comments dwarf_stack_traces_mode dedup_instructions no-tsan no-msan arm64 android compressed-pointers'
+                    log  'product no-code_comments dwarf_stack_traces_mode dedup_instructions no-tsan no-msan arm64 android compressed-pointers'  -> MATCH
+  => three independent readings of one version: the bytes of libapp.so, the bytes of
+     libflutter.so, and the tool's own log. The blutter dump is therefore about THIS
+     libapp.so, and Dart 3.5.4 is the SDK whose snapshot format it parses.

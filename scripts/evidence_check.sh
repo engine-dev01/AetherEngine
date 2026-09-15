@@ -5,7 +5,7 @@
 cd "$(dirname "$0")/.." || exit 1
 echo "=== [EC1] T1 vendored files exist ==="
 ok=0; fail=0
-for f in reference/snake/F2_dex_natives.txt reference/snake/F3_manifest.txt reference/NATIVE_CALLSITE_MAP.md; do
+for f in reference/snake/F1_apk_inventory.txt reference/snake/F2_dex_natives.txt reference/snake/F3_manifest.txt reference/snake/F4_libengine_jni.txt reference/snake/F5_libapp_dart.txt reference/snake/F6_libflutter_version.txt reference/snake/F7_ghidra_libengine.txt reference/snake/F8_blutter_libapp.txt reference/BOOT_LINKAGE.md reference/CALL_LINKAGE.md reference/NATIVE_CALLSITE_MAP.md; do
   if [ -f "$f" ]; then echo "  OK   $f"; ok=$((ok+1))
   else echo "  MISS $f"; fail=$((fail+1)); fi
 done

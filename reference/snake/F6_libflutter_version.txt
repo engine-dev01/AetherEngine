@@ -1,0 +1,38 @@
+=== F6 flutter_libs/libflutter.so ===
+sha256   : 0baa710d6b7f7de2f8bcc05aa2950bab2989f3a4c95bc7f7bcc23ce84626ee52
+build-id : 67d6564b8d334123ab2f76cbe8615dc2688a7cf8
+exports  : 46 defined dynamic symbols
+           of which 0 are Java_* JNI exports
+           JNI_OnLoad: present
+
+--- snapshot version candidates in the engine (NUL-delimited 32-hex) ---
+  file offset 0x1eafd4  va 0x1eafd4  kind=nul-delimited
+      version  : 80a49c7111088100a233b2ae788e1f48
+      features : (none adjacent)
+
+--- pairing with libapp.so ---
+  libapp.so snapshot version 80a49c7111088100a233b2ae788e1f48: 1 occurrence(s) in libflutter.so
+      at file offset 0x1eafd4 (va 0x1eafd4, section .rodata)
+
+--- second pairing signal: engine API names ---
+  libapp.so references 11 PlatformConfigurationNativeApi::* names;
+  libflutter.so contains 17;  shared = 11.
+    both  PlatformConfigurationNativeApi::DefaultRouteName             libapp@0x35285 libflutter@0x1ce1f9
+    both  PlatformConfigurationNativeApi::EndWarmUpFrame               libapp@0x1bbb9 libflutter@0x1cdd4c
+    both  PlatformConfigurationNativeApi::GetRootIsolateToken          libapp@0x3bc6d libflutter@0x1c5150
+    both  PlatformConfigurationNativeApi::Render                       libapp@0x489da libflutter@0x1c06f1
+    both  PlatformConfigurationNativeApi::RequestDartPerformanceMode   libapp@0x2cc51 libflutter@0x1d0278
+    both  PlatformConfigurationNativeApi::RespondToPlatformMessage     libapp@0x3291a libflutter@0x1cf6ea
+    both  PlatformConfigurationNativeApi::ScheduleFrame                libapp@0x1d0d7 libflutter@0x1cde34
+    both  PlatformConfigurationNativeApi::SendChannelUpdate            libapp@0x23e4d libflutter@0x1cbeff
+    both  PlatformConfigurationNativeApi::SendPlatformMessage          libapp@0x404fc libflutter@0x1cf79b
+    both  PlatformConfigurationNativeApi::SetNeedsReportTimings        libapp@0x1c083 libflutter@0x1baec8
+    both  PlatformConfigurationNativeApi::UpdateSemantics              libapp@0x32be6 libflutter@0x1bc97c
+    no name referenced by the snapshot is missing from the engine
+
+--- FlutterJNI native bindings ---
+  classes.dex declares 41 ACC_NATIVE methods on
+  io.flutter.embedding.engine.FlutterJNI. None of them is exported by name:
+    41/41 expected Java_* exports are absent from libflutter.so's .dynsym
+    JNI_OnLoad is exported, so the engine binds them with RegisterNatives at load time —
+    the same mechanism libengine.so uses for the 13 custom natives.

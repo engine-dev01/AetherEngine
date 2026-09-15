@@ -25,7 +25,7 @@ aether-android/
   test-stubs/         AOSP-signature stubs → localTest (no SDK, no Robolectric)
 aether-native/        C++ → libaether.so (JNI_OnLoad + RegisterNatives, 26 methods)
 app/                  Flutter shell (home_screen: Play, 1234 chain-check, Diag)
-reference/            Committed evidence: snake F2/F3 (T1) + jadx transcript (T2)
+reference/            Committed evidence: snake F1-F8 (T1) + BOOT_LINKAGE/CALL_LINKAGE (SP-01, T1) + jadx transcript (T2)
 docs/CUTS.md          Every deliberate cut/no-op: what, why, date, proof
 scripts/              All verification gates (below)
 ```
@@ -38,7 +38,7 @@ scripts/              All verification gates (below)
 | `:engine` | daemon + inner service, VPN service, SystemCallProvider |
 | `:p0`–`:p3` | `ProxyActivity$Pn` (+ `$Pn_L` landscape), ProxyService/Job/Provider per-slot |
 
-36 declared components (18 activity / 11 service / 6 provider / 1 receiver),
+33 declared components (18 activity / 8 service / 6 provider / 1 receiver),
 4 guest slots, provider-handshake spawn (`_Engine_|_init_process_` →
 `_Engine_|_client_`, linkToDeath slot release) ≡ SNAKE `a7.m` hop 11–12.
 
@@ -133,4 +133,6 @@ APK → GitHub Release `apk-v1.0.0`, arm64-v8a, ~30 MB).
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/CONFIG.md](docs/CONFIG.md)
   provisioning: [docs/PROVISIONING_8BP_56.23.2.md](docs/PROVISIONING_8BP_56.23.2.md)
 - [reference/README.md](reference/README.md) — evidence tiers + UNVERIFIED list
+- [reference/BOOT_LINKAGE.md](reference/BOOT_LINKAGE.md) — SP-01 boot chain: process start → `https://rest.snakeseller.com/api/request/`
+- [reference/CALL_LINKAGE.md](reference/CALL_LINKAGE.md) — full call linkage: instruction ↔ offset ↔ callee
 - [docs/CUTS.md](docs/CUTS.md) — every deliberate cut/gate with proof

@@ -1,0 +1,185 @@
+=== F4 binaries/libengine.so ===
+sha256    : f5d751e6bde8f0595eda9836338e845b029a41d2362743a2a4619ba99f41e3be
+build-id  : 1012c2caf5541be356d42b83494cc9bfe6bb1837
+SONAME    : libengine.so
+NEEDED    : libm.so, libdl.so, libc.so
+imports   : 136 undefined dynamic symbols
+exports   : 17 defined dynamic symbols
+
+--- defined dynamic exports ---
+  0x000f3fa0  STT_FUNC       JNI_OnLoad
+  0x00820838  STT_OBJECT     _ZTVNSt6__ndk119basic_istringstreamIcNS_11char_traitsIcEENS_9allocatorIcEEEE
+  0x00820888  STT_OBJECT     _ZTTNSt6__ndk119basic_istringstreamIcNS_11char_traitsIcEENS_9allocatorIcEEEE
+  0x008208a8  STT_OBJECT     _ZTCNSt6__ndk119basic_istringstreamIcNS_11char_traitsIcEENS_9allocatorIcEEEE0_NS_13basic_istreamIcS2_EE
+  0x008208f8  STT_OBJECT     _ZTVNSt6__ndk115basic_stringbufIcNS_11char_traitsIcEENS_9allocatorIcEEEE
+  0x00820978  STT_OBJECT     _ZTVNSt6__ndk114basic_ifstreamIcNS_11char_traitsIcEEEE
+  0x008209c8  STT_OBJECT     _ZTTNSt6__ndk114basic_ifstreamIcNS_11char_traitsIcEEEE
+  0x008209e8  STT_OBJECT     _ZTCNSt6__ndk114basic_ifstreamIcNS_11char_traitsIcEEEE0_NS_13basic_istreamIcS2_EE
+  0x00820a38  STT_OBJECT     _ZTVNSt6__ndk113basic_filebufIcNS_11char_traitsIcEEEE
+  0x00820ab8  STT_OBJECT     _ZTVNSt6__ndk118basic_stringstreamIcNS_11char_traitsIcEENS_9allocatorIcEEEE
+  0x00820b30  STT_OBJECT     _ZTTNSt6__ndk118basic_stringstreamIcNS_11char_traitsIcEENS_9allocatorIcEEEE
+  0x00820b80  STT_OBJECT     _ZTCNSt6__ndk118basic_stringstreamIcNS_11char_traitsIcEENS_9allocatorIcEEEE0_NS_14basic_iostreamIcS2_EE
+  0x00820bf8  STT_OBJECT     _ZTCNSt6__ndk118basic_stringstreamIcNS_11char_traitsIcEENS_9allocatorIcEEEE0_NS_13basic_istreamIcS2_EE
+  0x00820c48  STT_OBJECT     _ZTCNSt6__ndk118basic_stringstreamIcNS_11char_traitsIcEENS_9allocatorIcEEEE16_NS_13basic_ostreamIcS2_EE
+  0x00820c98  STT_OBJECT     _ZTVNSt6__ndk119basic_ostringstreamIcNS_11char_traitsIcEENS_9allocatorIcEEEE
+  0x00820ce8  STT_OBJECT     _ZTTNSt6__ndk119basic_ostringstreamIcNS_11char_traitsIcEENS_9allocatorIcEEEE
+  0x00820d08  STT_OBJECT     _ZTCNSt6__ndk119basic_ostringstreamIcNS_11char_traitsIcEENS_9allocatorIcEEEE0_NS_13basic_ostreamIcS2_EE
+
+--- Java_* exports: 0 ---
+  (none) — no JNI method is exported by name, so all of them are bound with RegisterNatives
+
+--- non-standard sections ---
+  .mytext  addr=0x81eeac  size=0xf4 (244 bytes)  exec=True write=False type=SHT_PROGBITS
+
+--- RegisterNatives call sites (JNIEnv slot 215 = +0x6b8, env-based): 3 ---
+  site @0xb0140   base=env   (blr at 0xb0144)
+      nMethods (arg3)  : 1
+          evidence     : 0xb0130: w3, #1  (arg3 = nMethods, set before the blr at 0xb0144)
+      methods table    : sp+0x38
+          evidence     : 0xb0124: x2, sp, #0x38 — the JNINativeMethod[] is assembled on the stack, so name/sig/fnPtr are runtime values; the stores into that frame below are what can still be recovered statically
+      class-name hint  : byte-decode loop at 0xb00d0 runs 8 times (strb + add x20,x20,#1 + cmp x20,#8 + b.ne)  [all loop bounds in window: [8]]
+      JNINativeMethod slots recovered from the stack frame:
+          entry[0].signature  sp+0x40 <- x24   value=runtime value
+          entry[0].fnPtr      sp+0x48 <- x22   value=None
+  site @0xb40a8   base=env   (blr at 0xb40b4)
+      nMethods (arg3)  : 2
+          evidence     : 0xb40ac: w3, #2  (arg3 = nMethods, set before the blr at 0xb40b4)
+      methods table    : sp+0x20
+          evidence     : 0xb409c: x2, sp, #0x20 — the JNINativeMethod[] is assembled on the stack, so name/sig/fnPtr are runtime values; the stores into that frame below are what can still be recovered statically
+      class-name hint  : byte-decode loop at 0xb4088 runs 3 times (strb + add x19,x19,#1 + cmp x19,#3 + b.ne)  [all loop bounds in window: [2, 3]]
+      JNINativeMethod slots recovered from the stack frame:
+          entry[1].name       sp+0x38 <- x22   value=runtime value
+          entry[1].signature  sp+0x40 <- x21   value=runtime value
+          entry[1].fnPtr      sp+0x48 <- x9   value=0x81eeb0   section=.mytext executable=True
+  site @0xf3a08   base=env   (blr at 0xf3a0c)
+      nMethods (arg3)  : 10
+          evidence     : 0xf3a04: w3, #0xa  (arg3 = nMethods, set before the blr at 0xf3a0c)
+      methods table    : 0x828ee8
+          evidence     : 0xf39fc: x2, x2, #0xee8 — absolute table at 0x828ee8 in .bss
+      class-name hint  : FindClass at 0xf39e4; byte-decode loop at 0xf39d0 runs 23 times (strb + add x19,x19,#1 + cmp x19,#23 + b.ne), so the JNI class name it materialises is that many characters long  [all loop bounds in window: [23]]
+      JNINativeMethod slots: none statically recoverable (table lives in writable memory filled at runtime)
+  TOTAL nMethods statically visible: 13
+
+--- every 0x6b8 load in the image, including rejected ones (audit trail) ---
+  0xb0140  indirect=True  base=env  -> USED
+        ldr x8, [x19] at file 0xb013c — x8 = *JNIEnv, i.e. the JNI function-table pointer
+  0xb40a8  indirect=True  base=env  -> USED
+        ldr x8, [x25] at file 0xb4090 — x8 = *JNIEnv, i.e. the JNI function-table pointer
+  0xf3a08  indirect=True  base=env  -> USED
+        ldr x8, [x24] at file 0xf39f0 — x8 = *JNIEnv, i.e. the JNI function-table pointer
+  0x79d338  indirect=True  base=global  -> rejected
+        adrp x8,#0x828000 at file 0x79d32c — points at 0x828000 (.bss), not at JNIEnv
+  0x7fea74  indirect=False  base=global  -> rejected
+        adrp x8,#0x839000 at file 0x7fea70 — points at 0x839000 (.bss), not at JNIEnv
+  0x81f514  indirect=False  base=global  -> rejected
+        adrp x16,#0x826000 at file 0x81f510 — points at 0x826000 (.got), not at JNIEnv
+
+--- JNI_OnLoad: decoded behaviour ---
+  decoded 420 instructions from 0xf3fa0
+  syscalls issued (svc #0 with a resolved x8):
+      0xf4018: mmap (#222)  args={'x2': '0x7', 'x3': '0x22'}  prot=RWX
+      0xf411c: mmap (#222)  args={'x0': '0x27', 'x2': '0x7', 'x3': '0x22'}  prot=RWX
+      0xf4428: fchmodat (#53)  args={}
+      0xf4458: fchmodat (#53)  args={}
+  RWX anonymous mappings requested: 2  -> ['0xf4018', '0xf411c']
+  AArch64 `B` opcode (0x14000000) materialised as a value: 2 site(s) ['0xf4040', '0xf4090']
+  indirect branches (blr): 2
+  JNIEnv slot calls: (none)
+
+--- .init_array (44 entries; values come from relocations) ---
+  [ 0] slot=0x825c78  value-from=reloc -> 0x11ab10  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [ 1] slot=0x825c80  value-from=reloc -> 0x147dec  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [ 2] slot=0x825c88  value-from=reloc -> 0x1750d8  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [ 3] slot=0x825c90  value-from=reloc -> 0x1a23c4  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [ 4] slot=0x825c98  value-from=reloc -> 0x1cf6b0  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [ 5] slot=0x825ca0  value-from=reloc -> 0x1fc99c  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [ 6] slot=0x825ca8  value-from=reloc -> 0x229c88  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [ 7] slot=0x825cb0  value-from=reloc -> 0x256f74  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [ 8] slot=0x825cb8  value-from=reloc -> 0x284260  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [ 9] slot=0x825cc0  value-from=reloc -> 0x2b154c  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [10] slot=0x825cc8  value-from=reloc -> 0x2de838  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [11] slot=0x825cd0  value-from=reloc -> 0x30bb24  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [12] slot=0x825cd8  value-from=reloc -> 0x338e10  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [13] slot=0x825ce0  value-from=reloc -> 0x3660ec  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [14] slot=0x825ce8  value-from=reloc -> 0x3933b8  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [15] slot=0x825cf0  value-from=reloc -> 0x3c06a4  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [16] slot=0x825cf8  value-from=reloc -> 0x3ed990  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [17] slot=0x825d00  value-from=reloc -> 0x41ac7c  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [18] slot=0x825d08  value-from=reloc -> 0xf8098  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [19] slot=0x825d10  value-from=reloc -> 0x447f68  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [20] slot=0x825d18  value-from=reloc -> 0x475254  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [21] slot=0x825d20  value-from=reloc -> 0x4a2540  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [22] slot=0x825d28  value-from=reloc -> 0x4cf82c  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [23] slot=0x825d30  value-from=reloc -> 0x4fcb18  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [24] slot=0x825d38  value-from=reloc -> 0x529e04  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [25] slot=0x825d40  value-from=reloc -> 0x5570f0  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [26] slot=0x825d48  value-from=reloc -> 0x5843dc  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [27] slot=0x825d50  value-from=reloc -> 0x5b16c8  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [28] slot=0x825d58  value-from=reloc -> 0x5de9b4  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [29] slot=0x825d60  value-from=reloc -> 0x60bca0  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [30] slot=0x825d68  value-from=reloc -> 0x638f8c  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [31] slot=0x825d70  value-from=reloc -> 0x666278  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [32] slot=0x825d78  value-from=reloc -> 0x693564  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [33] slot=0x825d80  value-from=reloc -> 0x6c0850  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [34] slot=0x825d88  value-from=reloc -> 0x6edb3c  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [35] slot=0x825d90  value-from=reloc -> 0x71ae28  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [36] slot=0x825d98  value-from=reloc -> 0x748114  in .text  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+  [37] slot=0x825da0  value-from=reloc -> 0x794ac  in .text  prologue=ffc302d1fd7b05a9fd430191fc6f06a9
+  [38] slot=0x825da8  value-from=reloc -> 0x8e270  in .text  prologue=ff0301d1fd7b02a9fd830091f44f03a9
+  [39] slot=0x825db0  value-from=reloc -> 0x8f4f0  in .text  prologue=fd7bbfa9fd030091c83c00b008c11591
+  [40] slot=0x825db8  value-from=reloc -> 0x8f554  in .text  prologue=fd7bbfa9fd030091c83c00b008011691
+  [41] slot=0x825dc0  value-from=reloc -> 0x8f5b4  in .text  prologue=fd7bbfa9fd030091c83c00b008c11691
+  [42] slot=0x825dc8  value-from=reloc -> 0x7e2590  in .text  prologue=3f2303d5fd7bbea9f30b00f9fd030091
+  [43] slot=0x825dd0  value-from=reloc -> 0x81ae24  in .text  prologue=3f2303d5ffc301d1fe4f06a900028052
+
+--- .init_array groups sharing an identical 16-byte prologue ---
+  37 entries  prologue=e80f19fcfd7b01a9fd430091fc6f02a9
+      indexes 0..36  span 0x62d604 bytes in .text
+      consecutive strides: {'0x2d2ec': 31, '0x2d2dc': 2, '0x2d2cc': 1, '-0x322be4': 1, '0x34fed0': 1}
+      pointer values supplied by: reloc
+
+--- imports worth naming ---
+  _ZN16xcrash_oneheader6detail5pipe2EPii
+      xCrash (one-header build) native crash handler
+  __system_property_get
+      reads Android system properties (device/ROM fingerprinting)
+  dl_iterate_phdr
+      enumerates loaded ELF images (unwinding / self-inspection)
+  dladdr
+      address -> symbol/library resolution at runtime
+  dlsym
+      dynamic symbol lookup (late binding without a PLT import)
+  getaddrinfo
+      DNS resolution
+  getauxval
+      reads the auxiliary vector (AT_HWCAP feature detection)
+  ioctl
+      device/control ioctls
+  mmap
+      maps memory at runtime
+  mprotect
+      changes page protection at runtime
+  prctl
+      process control (dumpability / tracer behaviour / thread name)
+  process_vm_readv
+      cross-process memory read (crash dump / inspection)
+  pthread_create
+      spawns threads
+
+--- word-pattern upper bounds (scan of every 4-byte word, NOT a decoded stream) ---
+  .text in this image also holds embedded data, so these counts bound the truth;
+  they are reported only to show the scale of the protector, never as instruction facts.
+  ldr_x_reg_0x6b8        6
+  movz_0x14000000        12199
+  svc0_encoding          25805
+
+--- JNI identifier probe: do the dex names appear in libengine.so? ---
+  48 of the 58 identifiers taken from classes.dex were searched
+  as exact byte sequences in the whole 8.5 MB image: JNI class names (both forms),
+  the method names, their descriptors and every legal mangled Java_* export name.
+  Skipped as too short to be meaningful (a 2-3 byte sequence occurs by chance):
+  '()V', 'ac', 'awl', 'chl', 'djp', 'eio', 'i', 'ic', 'na', 'nb'
+  RESULT: 0 hits. Not one JNI class name, method name, descriptor or
+  Java_* symbol string exists in libengine.so, so the JNINativeMethod
+  arrays handed to RegisterNatives are built at run time (see the
+  decode loops in F4d and the RWX mmap + branch-opcode writing in F4c).
