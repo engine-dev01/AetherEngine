@@ -355,9 +355,17 @@ class GuestRuntime private constructor(
             // measurement/ads services during onCreate — these throw
             // SecurityException on the main thread that disrupts game init
             // even when caught by the firewall (aborts Handler dispatch).
-            // PlayGamesInitProvider + FirebaseInitProvider are ALLOWED:
-            // they init SDK state the game expects; their binder calls are
-            // contained by Binder.clearCallingIdentity (step 2) + firewall.
+            // ★ GATED EXPERIMENT 2026-09-15 (device proof, apk 0955c54 round P4):
+            // FirebaseInitProvider สร้าง GMS measurement dynamite (m7.*) บน
+            // main-looper ของเรา → SE 'Unknown calling package name' หลุดจาก
+            // Handler.dispatchMessage = Zygote 'exited cleanly (0)' (ไม่มี
+            // FATAL/ANR/dropbox) — UncaughtExceptionHandler เป็นได้แค่ observer,
+            // ไม่ใช่ lifeline: ทุก build ก่อนหน้าจบแบบเดียวกันไม่ว่า chain/swallow
+            // snake/ninja รอดเพราะมีชั้น native กัน SE ลง worker (D5/P5) —
+            // interim: skip ตัวจุดชนวนหลัก; ย้ายเข้า virtual-broker (P5) แล้วคืน
+            if (providerClass == "com.google.firebase.provider.FirebaseInitProvider") {
+                return "skipped (FirebaseInitProvider → m7.* dynamite SE on main-looper; P5 replaces)"
+            }
             val skipPrefixes = listOf(
                 "com.google.android.gms.ads",           // MobileAdsInitProvider → external
                 "com.google.android.gms.measurement",   // AppMeasurement → dynamite killer

@@ -325,8 +325,14 @@ open class ProxyActivity : Activity() {
             // (0 rethrow families) → SE ที่เหลือ = GMS broker protocol (m7.*
             // dynamite measurement ส่งชื่อ guest ให้ com.google.android.gms ตรวจ
             // กับ PMS จริง — ไม่ใช่ระบบ service ของเราจึง spoof ที่ proxy ไม่ได้)
-            // และมัน dispatch บน MAIN looper ของ guest SDK ≡ เคสนinja ที่ blueprint
-            // D5 ระบุให้ไหลเป็น benign — swallow + report; เคสนอก family นี้ chain ตาม C15
+            // ★ ความจริงที่ apk 0955c54 (P4 round) พิสูจน์: 'swallow' บน MAIN ไม่ช่วย
+            //   ให้มีชีวิต — exception unwind ผ่าน dispatchMessage → Looper.loop จบ
+            //   → main() คืนค่า → Zygote log 'exited cleanly (0)' (ไม่มี FATAL/ANR/
+            //   dropbox): UncaughtExceptionHandler = ผู้สังเกต ไม่ใช่ผู้ช่วยชีวิต
+            //   ทุกสายที่ SE หลุดจาก main dispatch = process จบเหมือนกัน Whether
+            //   chain หรือ swallow → การแก้จริงคือกัน SE ไม่ให้ลง main (skip ตัว
+            //   จุดชนวน = FirebaseInitProvider gated, docs/CUTS.md; ทางถาวร = P5
+            //   virtual broker ≡ ชั้น worker ของ ninja D5)
             val gmsFamily = e.stackTrace.any { st ->
                 val c = st.className
                 c.startsWith("m7.") || c.startsWith("com.google.android.gms") ||
