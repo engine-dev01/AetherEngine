@@ -407,7 +407,20 @@ object SandboxManager {
             //    blueprint: SNAKE lv0.p() = root/data/app/<pkg>/package.conf
             try {
                 val confFile = File(root, "data/app/$targetPkg/package.conf")
-                if (!confFile.exists() || confFile.length() < 32) {
+                // ★ freshness (device proof 18:11 รอบนี้): log อ้าง sourceDir
+                //   /data/app/~~qYhfc… (path เก่า) แต่ dumpsys codePath ปัจจุบันคือ
+                //   /data/app/~~DpQg8… — เกมถูก reinstall ⇒ conf เก่าชี้ path ตาย;
+                //   เดิม skip rule ดูแค่ exists&&≥32B → ไม่มีวัน refresh
+                val stale = !confFile.exists() || confFile.length() < 32 || run {
+                    runCatching {
+                        val live = context.packageManager
+                            .getApplicationInfo(targetPkg, 0).sourceDir
+                        val conf = com.aether.PackageConfParser.parse(confFile.readBytes())
+                        // conf ฝัง apkPath ไว้ — ไม่ตรง = stale (path เปลี่ยน/ pkg หาย)
+                        live != conf.apkPath
+                    }.getOrDefault(true)   // parse fail = ถือว่า stale
+                }
+                if (stale) {
                     val bytes = generatePackageConf(targetPkg)
                     if (bytes.isNotEmpty()) {
                         confFile.parentFile?.mkdirs()
