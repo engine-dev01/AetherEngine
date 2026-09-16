@@ -16,9 +16,13 @@ Exit 1 = real gap.
 """
 import csv, os, re, sys
 
-ROOT = "/var/minis/workspace/AetherEngine_clean"
-CSV = "/var/minis/workspace/codes/Codes/SnakeLogic/call_linkage.csv"
+# repo root = parent of scripts/ (works locally and on CI checkout)
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(ROOT)
+# prefer the vendored T1 copy in-repo; fall back to the local extract
+CSV = "reference/snake/call_linkage.csv"
+if not os.path.exists(CSV):
+    CSV = "/var/minis/workspace/codes/Codes/SnakeLogic/call_linkage.csv"
 
 # kinds that must have a body on engine side (from actual CSV values seen)
 BACKED = {

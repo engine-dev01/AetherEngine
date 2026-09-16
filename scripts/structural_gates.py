@@ -42,6 +42,7 @@ reg = (ROOT / "aether-android/aether-app/src/main/kotlin/com/aether/engine/proxy
 MAX = int(re.search(r"MAX_SLOTS = (\d+)", reg.read_text(encoding="utf-8")).group(1))
 for m in ROOT.rglob("AndroidManifest.xml"):
     if "/build/" in str(m) or "/.gradle/" in str(m): continue
+    if "/reference/" in str(m): continue  # binary AAPT2 manifests (snake extract) — S2 only checks engine sources
     t = m.read_text(encoding="utf-8")
     n_prov = len(re.findall(r"com\.aether\.proxy\.content\.\d", t))
     n_slot_act = len(re.findall(r'ProxyActivity\$P\d"', t))

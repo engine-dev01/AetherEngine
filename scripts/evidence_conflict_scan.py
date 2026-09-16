@@ -3,7 +3,7 @@
 that contradicts another doc or the actual filesystem. Read-only."""
 import os, re, subprocess, sys
 
-ROOT = "/var/minis/workspace/AetherEngine_clean"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(ROOT)
 
 DOCS = []
@@ -51,7 +51,7 @@ print("\n[2] Numeric claims on SAME subject (potential contradiction)")
 FACTS = {
     "manifest components":   r"(\d+)\s*(?:components?|แถว)",
     "native count":          r"(\d+)\s*(?:natives?|native methods|externals)",
-    "T1 files":              r"F\d+[a-z]?_",
+    "T1 files":              r"(F\d+[a-z]?_)",
 }
 for subj, rx in FACTS.items():
     seen = {}
