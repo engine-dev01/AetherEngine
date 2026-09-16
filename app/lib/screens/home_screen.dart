@@ -37,7 +37,7 @@ import '../i18n/strings.dart';
 import '../widgets/key_card.dart';
 import '../widgets/license_banner.dart';
 
-void main() => runApp(const SnakeEngineApp());
+// Entry point lives in main.dart (single main() in the app — see that file).
 
 class SnakeEngineApp extends StatelessWidget {
   const SnakeEngineApp({super.key});

@@ -1,31 +1,12 @@
-// main.dart — AetherEngine Flutter shell (home screen — 8 Ball Pool only)
-// UI: banner + game card + paywall + bottom nav
-// Excluded: subscription/device API calls, social share links
-import 'package:flutter/material.dart';
+// main.dart — AetherEngine Flutter shell.
+//
+// Entry point only. The app, theme and root widget live in
+// screens/home_screen.dart (SnakeEngineApp) so that the whole UI surface is
+// one tree, matching the snake panel (docs/SNAKE_UI_BLUEPRINT.md).
+//
+// This file deliberately defines NO widget of its own: a second MaterialApp
+// here would shadow the one in home_screen.dart and drop the connectivity
+// gate (snake gate 1, pp+0xf630).
 import 'screens/home_screen.dart';
-import 'i18n/strings.dart';
 
-void main() => runApp(const AetherApp());
-
-class AetherApp extends StatelessWidget {
-  const AetherApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: S.appNameTitle,
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF101418),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF6B2DBC),
-          secondary: Color(0xFF00C853),
-          surface: Color(0xFF181C22),
-        ),
-        useMaterial3: true,
-      ),
-      home: const HomeScreen(),
-    );
-  }
-}
+void main() => runApp(const SnakeEngineApp());
