@@ -152,3 +152,28 @@ jobs:
           export KOTLINC_HOME="$HOME/.cache/aether-test/kotlinc"
           export JUNIT_HOME="$HOME/.cache/aether-test/junit-libs"
           ./gradlew --no-daemon --console=plain :aether-android:localTest
+
+  evidence-gates:
+    # Read-only evidence gates (T1-derived). No Android/Flutter toolchain —
+    # python3 only. Each gate exits non-zero on contradiction with the
+    # vendored evidence under reference/snake/ (call_linkage.csv etc.).
+    # chain_coherence.py + system_link_audit.py are NOT wired yet: they
+    # legitimately FAIL against open backlog items (documented in
+    # scripts/EVIDENCE_CONFLICTS.md) and would red-line CI before the port
+    # work lands. Re-add when their backlog closes.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run evidence gates
+        run: |
+          set -e
+          for g in jni_parity native_chain_parity structural_gates \
+                   wire_contract_check structure_coherence \
+                   snake_call_shape evidence_conflict_scan; do
+            echo "=== scripts/$g.py ==="
+            python3 "scripts/$g.py"
+          done
+          echo "All evidence gates PASS."
