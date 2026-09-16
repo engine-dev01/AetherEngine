@@ -30,6 +30,10 @@ local.properties
 # Extracted/decompiled APKs
 # (legacy extract dirs removed)
 
+# Raw snake T1 evidence (untracked — 284MB; keep on-disk only)
+# Contains classes.dex/apktool dumps; complements committed reference/snake/F1-F8
+reference/SNAKE_extract/
+
 # Build outputs
 *.aar
 

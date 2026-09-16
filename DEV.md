@@ -67,7 +67,7 @@ app/             # Flutter shell
 ```
 init() →
   1. VirtualAppContainer.setup()  # fake context, path redirect
-  2. ServiceBinderProxy.init()   # 8 system service hook
+  2. ServiceBinderProxy.init()   # 40 SERVICE_* constants declared (see ServiceBinderProxy.kt)
   3. (ArtHookEngine removed in V3 — was no-op)
   4. (StringObfuscator removed in V3 — was orphan)
   5. SandboxManager.init()        # bootstrap root/ (dataDir/root) + ELF stubs

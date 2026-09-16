@@ -131,7 +131,7 @@ APK → GitHub Release `apk-v1.0.0`, arm64-v8a, ~30 MB).
 - [DEV.md](DEV.md) — day-to-day (module map, gates, build flow, release)
 - [TESTING.md](TESTING.md) — test pipeline history (L1–L3, now gate table in DEV.md)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/CONFIG.md](docs/CONFIG.md)
-  provisioning: [docs/PROVISIONING_8BP_56.23.2.md](docs/PROVISIONING_8BP_56.23.2.md)
+  (provisioning doc PROVISIONING_8BP_56.23.2.md ถูกลบ 2026-09-14 — ดู docs/CUTS.md)
 - [reference/README.md](reference/README.md) — evidence tiers + UNVERIFIED list
 - [reference/BOOT_LINKAGE.md](reference/BOOT_LINKAGE.md) — SP-01 boot chain: process start → `https://rest.snakeseller.com/api/request/`
 - [reference/CALL_LINKAGE.md](reference/CALL_LINKAGE.md) — full call linkage: instruction ↔ offset ↔ callee

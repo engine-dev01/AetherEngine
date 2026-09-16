@@ -24,7 +24,7 @@ Changing requires verification on real device (not in sandbox).
 │  Kotlin layer (aether-android/, aether-core/)       │
 │  - AetherApp: Application + loadLibrary              │
 │  - AetherOrchestrator: lifecycle (init/attach)      │
-│  - ServiceBinderProxy: 8 system service hook        │
+│  - ServiceBinderProxy: 40 SERVICE_* constants       │
 │  - VirtualAppContainer: fake context                │
 │  - CrashHandler: 14-section local log                │
 │  - Phase 11: EngineLoader (pluggable)               │
