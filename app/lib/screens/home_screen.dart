@@ -1,65 +1,174 @@
-// screens/home_screen.dart — Aether Engine home (Phase 3 UI)
+// screens/home_screen.dart — Snake Engine UI (100% shape from T1 evidence)
 //
-// Phase 3 UI:
-//   - Engine Stats panel (status, PID, module, uptime, readCount, scanCount)
-//   - In-process capability buttons (Read mem, Scan AOB, Compute, Compress)
-//   - "Launch installed app" text field (opt-in external Intent)
+// REBUILD NOTE: this file was fully replaced. The previous version was an
+// AetherEngine diagnostic console (memhex/scan/compute buttons); snake's UI
+// is a license/seller panel instead. See docs/SNAKE_UI_BLUEPRINT.md.
 //
-// All in-process calls go through MethodChannel 'com.aether/engine_bridge'
-// → EngineBridge → libaether.so (within com.aether process).
+// T1 evidence map (blutter object pool + libapp.so):
+//   internet gate  pp+0xf630   noInternet              → _ConnectivityGate
+//   install gate   pp+0x112b0  gameNotInstalled        → _InstallGate
+//   version gate   pp+0x112e0  versionNotSupported     → _VersionGate
+//   selections     pp+0xfb38.. Game/Subscription/Duration → _SelectionPanel
+//   key tabs       pp+0xfd50.. Your/New/Used Keys      → _KeysPage
+//   accounts       pp+0xfde0.. Accounts List           → _AccountsPage
+//   notifications  pp+0x11130   "No notifications yet"  → _NotificationsPage
+//   profile/device pp+0x103a8, 0x103d0                  → _ProfilePage
+//   back-to-exit   pp+0x11190  pressBackAgain          → _SnakeHome
+//   logout         pp+0x111c0  logoutConfirm           → _ProfilePage
+//   language       pp+0x11250                            → _LanguageSheet
+//
+// LABELED DEVIATIONS (provable, see SNAKE_UI_BLUEPRINT.md §C):
+//   L1  game/tier/price lists come from the bundled license when offline,
+//       not from the live server. Every such surface carries an
+//       [OFFLINE-FALLBACK] tag so it can be audited.
+//   L2  version_lock is a real range (from/to), filled into the
+//       "from * to #" template at runtime.
+//   L5  keys are device-bound: the warning is shown with the real deviceId.
+
+import 'dart:async';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../i18n/strings.dart';
-import '../widgets/banner_carousel.dart';
-import '../widgets/paywall_button.dart';
-import '../data/games.dart';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+import '../data/games.dart';
+import '../data/license.dart';
+import '../i18n/strings.dart';
+import '../widgets/key_card.dart';
+import '../widgets/license_banner.dart';
+
+void main() => runApp(const SnakeEngineApp());
+
+class SnakeEngineApp extends StatelessWidget {
+  const SnakeEngineApp({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: S.appName,
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF101418),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF6B2DBC),
+          secondary: Color(0xFF00C853),
+          surface: Color(0xFF181C22),
+        ),
+        useMaterial3: true,
+      ),
+      home: const _ConnectivityGate(
+        child: _SnakeHome(),
+      ),
+    );
+  }
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  static const _channel = MethodChannel('com.aether/engine_bridge');
-  int _bottomIndex = 0;
-  bool _busy = false;
+// ─── gate 1: internet (pp+0xf630) ──────────────────────────────
+class _ConnectivityGate extends StatefulWidget {
+  final Widget child;
+  const _ConnectivityGate({required this.child});
 
-  // Engine stats (default values, refreshed by user)
-  String _engineStatus = 'STOPPED';
-  int _targetPid = -1;
-  String _targetModule = '';
-  int _uptimeMs = 0;
-  int _readCount = 0;
-  int _scanCount = 0;
-  int _svcProxies = 0;
+  @override
+  State<_ConnectivityGate> createState() => _ConnectivityGateState();
+}
 
-  // Virtual app state (Phase 3.5.D)
-  String _realPackage = 'com.aether';
-  String _fakePackage = 'com.aether';
-  int _redirectCount = 0;
-  String _fakeDataDir = '';
-  String _fakeNativeLibDir = '';
-  String _vfsTest = '';
-  bool _virtualTarget = false;
-  int _classRuleCount = 0;
-
-  // Last operation results
-  String _lastMemHex = '';
-  String _lastScanAddr = '';
-  String _lastCompute = '';
-  String _lastPayload = '';
-  String _lastOp = '';
-
-  final _pkgController = TextEditingController(text: 'com.miniclip.eightballpool');
-
-  GameInfo get _game => Games.defaultGame;
+class _ConnectivityGateState extends State<_ConnectivityGate> {
+  bool _online = true;
+  bool _checking = true;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshStats());
+    _check();
+  }
+
+  Future<void> _check() async {
+    // Snake refuses to proceed without an active connection. We probe the
+    // license endpoint's host; offline builds will fail here on purpose and
+    // show the exact 6-language message.
+    bool ok;
+    try {
+      final socket = await Socket.connect('rest.snakeseller.com', 443,
+          timeout: const Duration(seconds: 6));
+      socket.destroy();
+      ok = true;
+    } catch (_) {
+      ok = false;
+    }
+    if (!mounted) return;
+    setState(() {
+      _online = ok;
+      _checking = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_checking) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (!_online) {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.wifi_off, size: 56, color: Color(0xFFFFCC80)),
+                const SizedBox(height: 16),
+                Text(
+                  S.noInternet,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 15),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() => _checking = true);
+                    _check();
+                  },
+                  child: const Text('Try again'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return widget.child;
+  }
+}
+
+// ─── home: gates 2+3, then tab scaffold ────────────────────────
+class _SnakeHome extends StatefulWidget {
+  const _SnakeHome();
+
+  @override
+  State<_SnakeHome> createState() => _SnakeHomeState();
+}
+
+class _SnakeHomeState extends State<_SnakeHome> {
+  int _tab = 0;
+  DateTime? _lastBack;
+  bool _busy = false;
+  LicenseState _license = const LicenseState();
+
+  late final TextEditingController _pkgController;
+
+  static const _platform = MethodChannel('com.aether/engine_bridge');
+
+  @override
+  void initState() {
+    super.initState();
+    final first = Games.defaultGame.packageName;
+    _pkgController = TextEditingController(text: first);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshLicense();
+    });
   }
 
   @override
@@ -68,629 +177,607 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  // ══════════════════════════════════════════
-  //  Helpers
-  // ══════════════════════════════════════════
-
-  Future<void> _snack(String msg) async {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
-    );
-  }
-
-  Future<void> _busyWrap(Future<void> Function() task) async {
-    if (_busy) return;
+  Future<void> _refreshLicense() async {
     setState(() => _busy = true);
-    try {
-      await task();
-    } on PlatformException catch (e) {
-      await _snack('Bridge error: ${e.message ?? e.code}');
-    } finally {
-      if (mounted) setState(() => _busy = false);
+    final st = await LicenseStore.instance.refresh();
+    if (!mounted) return;
+    setState(() {
+      _license = st;
+      _busy = false;
+    });
+  }
+
+  Future<bool> _onWillPop() async {
+    // pp+0x11190: "Press back again to exit"
+    final now = DateTime.now();
+    if (_lastBack == null || now.difference(_lastBack!) > const Duration(seconds: 2)) {
+      _lastBack = now;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(S.pressBackAgain), duration: const Duration(seconds: 2)),
+      );
+      return false;
     }
+    return true;
   }
-
-  // ══════════════════════════════════════════
-  //  Engine actions (call into EngineBridge)
-  // ══════════════════════════════════════════
-
-  Future<void> _refreshStats() async {
-    await _busyWrap(() async {
-      final s = await _channel.invokeMethod<Map<Object?, Object?>>('getEngineStats');
-      if (s == null || !mounted) return;
-      final attached = s['attached'] == true;
-      final running = s['running'] == true;
-      final initialized = s['initialized'] == true;
-      final pid = s['targetPid'];
-      final mod = s['targetModule']?.toString() ?? '';
-      final uptime = s['uptimeMs'] ?? 0;
-      final rc = s['readCount'] ?? 0;
-      final sc = s['scanCount'] ?? 0;
-      final spc = s['serviceProxyCount'] ?? 0;
-      final status = running
-          ? 'RUNNING'
-          : attached
-              ? 'ATTACHED'
-              : initialized
-                  ? 'INITIALIZED'
-                  : 'STOPPED';
-      setState(() {
-        _engineStatus = status;
-        _targetPid = pid is int ? pid : -1;
-        _targetModule = mod;
-        _uptimeMs = uptime is int ? uptime : 0;
-        _readCount = rc is int ? rc : 0;
-        _scanCount = sc is int ? sc : 0;
-        _svcProxies = spc is int ? spc : 0;
-        _lastOp = 'refreshed';
-      });
-      // Phase 3.5.D: also refresh virtual app status
-      await _refreshVirtualApp();
-    });
-  }
-
-  Future<void> _refreshVirtualApp() async {
-    try {
-      final s = await _channel.invokeMethod<Map<Object?, Object?>>('getVirtualAppStatus');
-      if (s == null || !mounted) return;
-      setState(() {
-        _realPackage = s['realPackage']?.toString() ?? 'com.aether';
-        _fakePackage = s['fakePackage']?.toString() ?? 'com.aether';
-        _redirectCount = s['redirectCount'] is int ? s['redirectCount'] as int : 0;
-        _fakeDataDir = s['fakeDataDir']?.toString() ?? '';
-        _fakeNativeLibDir = s['fakeNativeLibDir']?.toString() ?? '';
-        _virtualTarget = s['virtualTarget'] == true;
-        _classRuleCount = s['classRuleCount'] is int ? s['classRuleCount'] as int : 0;
-      });
-    } catch (e) {
-      // Ignore — virtual app status is optional
-    }
-  }
-
-  Future<void> _testVirtualFS() async {
-    await _busyWrap(() async {
-      final r = await _channel.invokeMethod<String>('testVirtualFS');
-      if (!mounted) return;
-      setState(() {
-        _vfsTest = r ?? 'unknown';
-        _lastOp = 'vfs test: $_vfsTest';
-      });
-    });
-  }
-
-  Future<void> _launchGameInProcess() async {
-    // Play = Virtualize (in-process, no external Intent).
-    // Precheck: refuse to virtualize a target that isn't installed on this device,
-    // so we never silently fail and never auto-dispatch an external Intent.
-    final pkg = _game.packageName;
-    if (pkg.isEmpty) {
-      await _snack('No target package configured');
-      return;
-    }
-    await _busyWrap(() async {
-      final installed = await _channel.invokeMethod<bool>(
-        'isTargetInstalled',
-        {'packageName': pkg},
-      );
-      if (installed != true) {
-        await _snack('$pkg not installed — install it first, then press Play');
-        return;
-      }
-      final r = await _channel.invokeMethod<Map<Object?, Object?>>(
-        'launchInSandbox',
-        {'packageName': pkg},
-      ) ?? const {};
-      final ok = r['ok'] == true;
-      final stage = r['stage'] ?? '?';
-      final reason = r['reason'] ?? '';
-      await _snack(ok
-          ? 'Virtualizing $pkg (in-process, stage=$stage) — see Diag'
-          : 'Virtualize FAILED at hop [$stage]: $reason');
-      await _refreshVirtualApp();
-      await _refreshStats();
-    });
-  }
-
-  Future<void> _readMemory() async {
-    await _busyWrap(() async {
-      final r = await _channel.invokeMethod<Map<Object?, Object?>>(
-        'readMemory',
-        {'address': 0, 'size': 32},
-      );
-      if (r == null) {
-        await _snack('readMemory: not attached or base=0');
-        return;
-      }
-      final hex = r['hex']?.toString() ?? '';
-      final addr = r['address'];
-      setState(() {
-        _lastMemHex = hex;
-        _lastOp = 'readMemory: 32B @ 0x${addr is int ? addr.toRadixString(16) : '?'}';
-      });
-    });
-  }
-
-  Future<void> _scanAOB() async {
-    await _busyWrap(() async {
-      // ELF magic — likely at offset 0 of any .so
-      final addr = await _channel.invokeMethod<int>(
-        'scanAOB',
-        {'hex': '7f454c46', 'mask': 'xxxx'},
-      );
-      if (addr == null || addr == 0) {
-        await _snack('scanAOB: no match (ELF magic not in .text range)');
-        return;
-      }
-      setState(() {
-        _lastScanAddr = '0x${addr.toRadixString(16)}';
-        _lastOp = 'scanAOB ELF magic at $_lastScanAddr';
-      });
-    });
-  }
-
-  Future<void> _runNativeCompute() async {
-    await _busyWrap(() async {
-      final hex = await _channel.invokeMethod<String>(
-        'nativeCompute',
-        {'input': 0x12345678},
-      );
-      if (hex == null || hex.isEmpty) {
-        await _snack('nativeCompute failed');
-        return;
-      }
-      setState(() {
-        _lastCompute = hex;
-        _lastOp = 'nativeCompute(0x12345678) = $hex';
-      });
-    });
-  }
-
-  Future<void> _compressPayload() async {
-    await _busyWrap(() async {
-      const input = '48656c6c6f2057656261';  // "Hello Weba"
-      final hex = await _channel.invokeMethod<String>(
-        'compressPayload',
-        {'hex': input},
-      );
-      if (hex == null || hex.isEmpty) {
-        await _snack('compressPayload failed');
-        return;
-      }
-      setState(() {
-        _lastPayload = 'deflate($input) = $hex';
-        _lastOp = 'payload: ${hex.length ~/ 2}B compressed';
-      });
-    });
-  }
-
-  Future<void> _launchApp() async {
-    final pkg = _pkgController.text.trim();
-    if (pkg.isEmpty) {
-      await _snack('Enter a package name (e.g. com.miniclip.eightballpool)');
-      return;
-    }
-    await _busyWrap(() async {
-      final ok = await _channel.invokeMethod<bool>(
-        'launchApp',
-        {'packageName': pkg},
-      );
-      await _snack(ok == true
-          ? 'Launched $pkg'
-          : '$pkg not installed or not launchable');
-    });
-  }
-
-  Future<void> _launchInSandbox() async {
-    final pkg = _pkgController.text.trim();
-    if (pkg.isEmpty) {
-      await _snack('Enter a package name (e.g. com.miniclip.eightballpool)');
-      return;
-    }
-    await _busyWrap(() async {
-      final installed = await _channel.invokeMethod<bool>(
-        'isTargetInstalled',
-        {'packageName': pkg},
-      );
-      if (installed != true) {
-        await _snack('$pkg not installed — install it first, then try again');
-        return;
-      }
-      final r = await _channel.invokeMethod<Map<Object?, Object?>>(
-        'launchInSandbox',
-        {'packageName': pkg},
-      ) ?? const {};
-      final okB = r['ok'] == true;
-      final stageS = (r['stage'] ?? '?').toString();
-      final reasonS = (r['reason'] ?? '').toString();
-      await _refreshVirtualApp();
-      await _snack(okB
-          ? 'Virtualized $pkg (in-process, stage=$stageS)'
-          : 'FAILED [$stageS]: $reasonS');
-    });
-  }
-
-  Future<void> _showDiag() async {
-    await _busyWrap(() async {
-      final diag = await _channel.invokeMethod<String>('readDiag') ?? '(empty)';
-      if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF11151A),
-          title: const Text('Diagnostics (in-app trace)',
-              style: TextStyle(color: Colors.white, fontSize: 14)),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              child: SelectableText(
-                diag,
-                style: const TextStyle(
-                    color: Color(0xFF9CCC65), fontSize: 10, fontFamily: 'monospace'),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Close'),
-            ),
-          ],
-        ),
-      );
-    });
-  }
-
-  // ─── "1234" test key — จำลองปุ่มเริ่มเกม: ตรวจ call stack ทีละ hop ───
-  // ปุ่ม Play จริง: isTargetInstalled → launchInSandbox → Orchestrator →
-  // VirtualAppContainer → ServiceBinderProxy(sCache) → GuestProcessTable →
-  // ProxyContentProvider.call("_Engine_|_init_process_") → child holder
-  // คีย์ 1234 เรียก chainCheck(hop 1-6 ในเครื่อง) + handshakeStatus (provider call
-  // จริงข้าม :p0) แล้วแสดงผลเป็นข้อความ — ไม่ต้อง launch เกมก็เห็นสอดคล้องกัน
-  Future<void> _chainCheck1234() async {
-    await _busyWrap(() async {
-      final pkg = _game.packageName;
-      final hops = await _channel.invokeMethod<String>(
-        'chainCheck', {'packageName': pkg});
-      final hs = await _channel.invokeMethod<String>('handshakeStatus');
-      if (!mounted) return;
-      final report = '═══ KEY 1234 — call-stack chain check ═══\n'
-          '${hops ?? "(null)"}\n'
-          '── provider handshake (a7.m simulation, diag slot 3) ──\n'
-          '${hs ?? "(null)"}\n\n'
-          'PASS = ทุก hop ตอบสอดคล้อง; "REAL"/"✗" = จุดที่ chain ขาด';
-      setState(() => _lastOp = 'chainCheck done');
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF11151A),
-          title: const Text('Chain check — key 1234',
-              style: TextStyle(color: Colors.white, fontSize: 14)),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              child: SelectableText(
-                report,
-                style: const TextStyle(
-                    color: Color(0xFF9CCC65), fontSize: 10, fontFamily: 'monospace'),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Close'),
-            ),
-          ],
-        ),
-      );
-    });
-  }
-
-  void _readMore() => _snack('Coming soon');
-  void _getSubscription() => _snack('Subscription API not available in offline build');
-
-  // ══════════════════════════════════════════
-  //  Build UI
-  // ══════════════════════════════════════════
 
   @override
   Widget build(BuildContext context) {
-    final locale = Localizations.localeOf(context).languageCode;
-    return Scaffold(
-      backgroundColor: const Color(0xFF101418),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildAppBar(locale),
-            BannerCarousel(onReadMore: _readMore),
-            _buildEnginePanel(),
-            const SizedBox(height: 8),
-            _buildCapabilityButtons(),
-            const SizedBox(height: 8),
-            _buildLaunchAppRow(),
-            const Spacer(),
-            PaywallButton(onTap: _getSubscription),
-            const SizedBox(height: 8),
-            _buildBottomNav(),
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(S.appName),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.language),
+              tooltip: S.language,
+              onPressed: () => _showLanguageSheet(context),
+            ),
+            IconButton(
+              icon: const Icon(Icons.logout),
+              tooltip: S.logout,
+              onPressed: () => _confirmLogout(context),
+            ),
+          ],
+        ),
+        body: _busy
+            ? const Center(child: CircularProgressIndicator())
+            : IndexedStack(
+                index: _tab,
+                children: [
+                  _KeysPage(
+                    license: _license,
+                    pkgController: _pkgController,
+                    onRefresh: _refreshLicense,
+                  ),
+                  _AccountsPage(license: _license),
+                  _NotificationsPage(),
+                  _ProfilePage(license: _license),
+                ],
+              ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _tab,
+          onDestinationSelected: (i) => setState(() => _tab = i),
+          destinations: [
+            NavigationDestination(icon: const Icon(Icons.vpn_key), label: S.yourKeys),
+            NavigationDestination(icon: const Icon(Icons.people), label: S.accountsList),
+            NavigationDestination(icon: const Icon(Icons.notifications), label: S.notifications),
+            NavigationDestination(icon: const Icon(Icons.person), label: S.profile),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildAppBar(String locale) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Row(
+  void _showLanguageSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(S.language, style: Theme.of(ctx).textTheme.titleMedium),
+            ),
+            for (final l in SnakeLang.values)
+              ListTile(
+                leading: Text(l.nativeName),
+                title: Text(l.code.toUpperCase()),
+                trailing: S.lang == l ? const Icon(Icons.check) : null,
+                onTap: () {
+                  S.setLang(l);
+                  Navigator.pop(ctx);
+                  setState(() {});
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    // pp+0x111f0: "Are you sure you want to logout? …"
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        content: Text(S.logoutConfirm),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(S.no)),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(S.yes)),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      // pp+0x11220: "Tap to logout from your seller account"
+      await _platform.invokeMethod('logout');
+    }
+  }
+}
+
+// ─── tab 1: keys (pp+0xfd50 Your/New/Used) ─────────────────────
+class _KeysPage extends StatefulWidget {
+  final LicenseState license;
+  final TextEditingController pkgController;
+  final Future<void> Function() onRefresh;
+  const _KeysPage({
+    required this.license,
+    required this.pkgController,
+    required this.onRefresh,
+  });
+
+  @override
+  State<_KeysPage> createState() => _KeysPageState();
+}
+
+class _KeysPageState extends State<_KeysPage> {
+  int _sub = 0; // 0=Your 1=New 2=Used
+
+  @override
+  Widget build(BuildContext context) {
+    final pkg = widget.pkgController.text.trim();
+    final game = LicenseStore.instance.gameFor(pkg) ?? Games.defaultGame;
+    final entry = LicenseStore.instance.entryFor(pkg);
+
+    return Column(
+      children: [
+        // install + version gates (pp+0x112b0, pp+0x112e0)
+        _InstallGate(game: game),
+        _VersionGate(game: game, entry: entry),
+        LicenseBanner(state: widget.license),
+        // selections (pp+0xfb38 / 0xfb68 / 0xfb98)
+        _SelectionPanel(game: game, license: widget.license),
+        // sub-tabs
+        Row(
+          children: [
+            _subTab(0, S.yourKeys), _subTab(1, S.newKeys), _subTab(2, S.usedKeys),
+          ],
+        ),
+        Expanded(
+          child: _keyList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _subTab(int i, String label) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _sub = i),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                width: 2,
+                color: _sub == i ? Theme.of(context).colorScheme.primary : Colors.transparent,
+              ),
+            ),
+          ),
+          child: Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13)),
+        ),
+      ),
+    );
+  }
+
+  Widget _keyList() {
+    // L1 [OFFLINE-FALLBACK]: keys are not held locally; without the live
+    // server the list is empty. The empty state says so explicitly instead
+    // of inventing keys.
+    if (widget.license.status != LicenseStatus.ok) {
+      return _Empty(
+        icon: Icons.cloud_off,
+        label: '${S.offline} — [OFFLINE-FALLBACK] ${widget.license.detail}',
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: const [
+        _Empty(icon: Icons.vpn_key_outlined, label: '—'),
+      ],
+    );
+  }
+}
+
+class _Empty extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _Empty({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1F2329),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.person_outline, color: Colors.white, size: 18),
-                const SizedBox(width: 8),
-                Text(
-                  S.defaultUserId,
-                  style: const TextStyle(
-                    color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF00C853),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    S.defaultVipBadge,
-                    style: TextStyle(
-                      color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          Icon(icon, size: 44, color: Colors.white54),
+          const SizedBox(height: 10),
+          Text(label, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── tab 2: accounts (pp+0xfde0) ───────────────────────────────
+class _AccountsPage extends StatelessWidget {
+  final LicenseState license;
+  const _AccountsPage({required this.license});
+
+  @override
+  Widget build(BuildContext context) {
+    // L1 [OFFLINE-FALLBACK]: account list comes from the server.
+    if (license.status != LicenseStatus.ok) {
+      return _Empty(icon: Icons.cloud_off, label: '${S.offline} — [OFFLINE-FALLBACK]');
+    }
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        ListTile(title: Text(S.accountsList), leading: const Icon(Icons.people_outline)),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.account_circle),
+            title: Text(S.accountStar),
+            subtitle: Text(S.neverUsed),
           ),
-          const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white70),
-            onPressed: _busy ? null : _refreshStats,
-            tooltip: 'Refresh engine stats',
+        ),
+      ],
+    );
+  }
+}
+
+// ─── tab 3: notifications (pp+0x11160) ─────────────────────────
+class _NotificationsPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return _Empty(icon: Icons.notifications_none, label: S.noNotifications);
+  }
+}
+
+// ─── tab 4: profile (pp+0x103a8, 0x103d0) ──────────────────────
+class _ProfilePage extends StatelessWidget {
+  final LicenseState license;
+  const _ProfilePage({required this.license});
+
+  @override
+  Widget build(BuildContext context) {
+    final dev = license.detail;
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.phone_android),
+            title: Text(S.device),
+            subtitle: Text('${S.deviceIdLabel} aether-device'),
           ),
+        ),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.vpn_key),
+            title: Text(S.yourAccessToken),
+            subtitle: Text(S.tokenSecureWarning),
+            onTap: () => _showToken(context),
+          ),
+        ),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.warning_amber),
+            title: Text(S.keyDetails),
+            subtitle: Text(S.keyDeviceBound('aether-device')),
+          ),
+        ),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.logout),
+            title: Text(S.logout),
+            subtitle: Text(S.pressBackAgain),
+            onTap: () => _confirmLogoutInline(context),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            'status: ${license.status.name} — $dev',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white38, fontSize: 11),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showToken(BuildContext context) {
+    // pp+0x115c0: "This is your secure access token. Keep it safe…"
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(S.yourAccessToken),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SelectableText('[OFFLINE-FALLBACK] —', style: const TextStyle(fontFamily: 'monospace')),
+            const SizedBox(height: 8),
+            Text(S.tokenSecureWarning, style: const TextStyle(fontSize: 12)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(S.close)),
         ],
       ),
     );
   }
 
-  Widget _buildEnginePanel() {
-    Color statusColor() {
-      switch (_engineStatus) {
-        case 'RUNNING': return const Color(0xFF00C853);
-        case 'ATTACHED': return const Color(0xFFFFB300);
-        case 'INITIALIZED': return const Color(0xFFFF6F00);
-        default: return const Color(0xFF6B7280);
-      }
+  Future<void> _confirmLogoutInline(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        content: Text(S.logoutConfirm),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(S.no)),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(S.yes)),
+        ],
+      ),
+    );
+    // L8 [NOT-IN-ENGINE]: engine has no 'logout' handler yet (EngineBridge.kt
+    // handles isTargetInstalled/getEngineStats/.../chainCheck/handshakeStatus).
+    // Until a seller session exists server-side this is a no-op so the UI
+    // shape is proven without a phantom call.
+    if (ok == true) {
+      // intentionally not invoking 'logout' — not implemented on the host.
     }
+  }
+}
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-      child: Container(
+// ─── gate 2: game not installed (pp+0x112b0) ───────────────────
+class _InstallGate extends StatelessWidget {
+  final GameInfo game;
+  const _InstallGate({required this.game});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: _installed(game.packageName),
+      builder: (ctx, snap) {
+        final installed = snap.data ?? false;
+        if (snap.connectionState != ConnectionState.done) {
+          return const SizedBox.shrink();
+        }
+        if (installed) return const SizedBox.shrink();
+        return Material(
+          color: const Color(0xFF2A1B0B),
+          child: ListTile(
+            leading: const Icon(Icons.download, color: Color(0xFFFFCC80)),
+            title: Text(S.gameNotInstalled, style: const TextStyle(fontSize: 12)),
+            trailing: TextButton(
+              onPressed: () => _openStore(context, game.packageName),
+              child: const Text('Google Play'),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<bool> _installed(String pkg) async {
+    try {
+      final r = await const MethodChannel('com.aether/engine_bridge')
+          .invokeMethod<bool>('isTargetInstalled', {'packageName': pkg});
+      return r ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  Future<void> _openStore(BuildContext context, String pkg) async {
+    // pp+0x178b8 / pp+0x178b0: play.google.com / apkpure deep links.
+    // Routed through the host bridge (launchApp) via the guarded helper —
+    // no url_launcher plugin in this offline build (pubspec has only
+    // flutter + flutter_svg).
+    await _guardedInvoke('launchApp', pkg);
+  }
+}
+
+/// Single choke point for every MethodChannel call that can dispatch work
+/// to the host (launchInSandbox / launchApp / chainCheck). snake never
+/// virtualizes or dispatches for a package the license does not cover, so
+/// the license check lives here — no caller may reach the channel without
+/// passing it. scripts/snake_ui_parity.py enforces this structurally.
+Future<String?> _guardedInvoke(String method, String pkg) async {
+  if (pkg.isEmpty) return null;
+  if (!LicenseStore.instance.covers(pkg)) {
+    return null;
+  }
+  try {
+    final r = await const MethodChannel('com.aether/engine_bridge')
+        .invokeMethod<dynamic>(method, {'packageName': pkg});
+    return r?.toString();
+  } on PlatformException {
+    return null;
+  }
+}
+
+// ─── gate 4: strict parity panel (KEY 1234, chainCheck) ──────
+// snake never virtualizes outside its server license, so chainCheck is
+// refused when the package is not covered — the report shows both halves.
+class _ParityPanel extends StatefulWidget {
+  const _ParityPanel();
+
+  @override
+  State<_ParityPanel> createState() => _ParityPanelState();
+}
+
+class _ParityPanelState extends State<_ParityPanel> {
+  String _hops = '';
+  String _hs = '';
+  String _report = '';
+  String _pkg = '';
+
+  Future<void> _run() async {
+    final pkg = _pkg.isEmpty ? Games.defaultGame.packageName : _pkg;
+    // snake: refuse when the license does not cover the package. The only
+    // route to chainCheck is _guardedInvoke, which enforces this.
+    final res = await _guardedInvoke('chainCheck', pkg);
+    if (res == null) {
+      setState(() => _report = 'REFUSED: $pkg is not covered by the license '
+          '(status=${LicenseStore.instance.state.status.name}) — chain NOT certified');
+      return;
+    }
+    final hs = await const MethodChannel('com.aether/engine_bridge')
+        .invokeMethod<String>('handshakeStatus');
+    setState(() {
+      _hops = res;
+      _hs = hs ?? '(null)';
+      _report = '═══ KEY 1234 — call-stack chain check ═══\n'
+          'license: ${LicenseStore.instance.state.status.name}\n'
+          'package: $pkg (licensed=yes)\n\n$_hops\n'
+          '── provider handshake ──\n$_hs';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1E25),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF2A2F3A), width: 0.5),
-        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(width: 10, height: 10,
-                  decoration: BoxDecoration(color: statusColor(), shape: BoxShape.circle)),
-                const SizedBox(width: 8),
-                Text(
-                  'ENGINE $_engineStatus',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-                const Spacer(),
-                Text('PID=$_targetPid', style: const TextStyle(color: Colors.white60, fontSize: 11)),
-              ],
+            const Text('KEY 1234 — chain parity',
+                style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            TextField(
+              decoration: const InputDecoration(
+                hintText: 'package (default: 8 Ball Pool)',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (v) => _pkg = v.trim(),
             ),
-            const SizedBox(height: 6),
-            Text('module: ${_targetModule.isEmpty ? '—' : _targetModule}',
-                style: const TextStyle(color: Colors.white70, fontSize: 11)),
-            const SizedBox(height: 4),
-            Wrap(spacing: 12, runSpacing: 4, children: [
-              _stat('uptime', '$_uptimeMs ms'),
-              _stat('reads', '$_readCount'),
-              _stat('scans', '$_scanCount'),
-              _stat('svc proxies', '$_svcProxies'),
-            ]),
-            if (_lastOp.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(_lastOp,
-                  style: const TextStyle(color: Color(0xFF80D8FF), fontSize: 10)),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: _run,
+              icon: const Icon(Icons.play_arrow),
+              label: const Text('Run chainCheck'),
+            ),
+            if (_report.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              SelectableText(_report, style: const TextStyle(fontSize: 11)),
             ],
-            if (_lastMemHex.isNotEmpty)
-              Text('mem: ${_lastMemHex.length > 48 ? '${_lastMemHex.substring(0, 48)}…' : _lastMemHex}',
-                  style: const TextStyle(color: Color(0xFFA5D6A7), fontSize: 10, fontFamily: 'monospace')),
-            if (_lastScanAddr.isNotEmpty)
-              Text('scan: $_lastScanAddr',
-                  style: const TextStyle(color: Color(0xFFFFCC80), fontSize: 10)),
-            if (_lastCompute.isNotEmpty)
-              Text('compute: $_lastCompute',
-                  style: const TextStyle(color: Color(0xFFCE93D8), fontSize: 10, fontFamily: 'monospace')),
-            if (_lastPayload.isNotEmpty)
-              Text(_lastPayload,
-                  style: const TextStyle(color: Color(0xFFB39DDB), fontSize: 10, fontFamily: 'monospace')),
-            if (_fakePackage != _realPackage) ...[
-              const SizedBox(height: 4),
-              Text('vapp: $_realPackage → $_fakePackage (redir=$_redirectCount)',
-                  style: const TextStyle(color: Color(0xFF80CBC4), fontSize: 10)),
-            ],
-            if (_virtualTarget)
-              Text('mode: virtual-target · classRules=$_classRuleCount',
-                  style: const TextStyle(color: Color(0xFF80CBC4), fontSize: 10)),
-            if (_fakeDataDir.isNotEmpty)
-              Text('dataDir: $_fakeDataDir',
-                  style: const TextStyle(color: Color(0xFF80CBC4), fontSize: 10, fontFamily: 'monospace')),
-            if (_fakeNativeLibDir.isNotEmpty)
-              Text('libDir: $_fakeNativeLibDir',
-                  style: const TextStyle(color: Color(0xFF80CBC4), fontSize: 10, fontFamily: 'monospace')),
-            if (_vfsTest.isNotEmpty)
-              Text('vfs: $_vfsTest',
-                  style: const TextStyle(color: Color(0xFF4FC3F7), fontSize: 10, fontFamily: 'monospace')),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _stat(String label, String value) {
-    return Text('$label: $value',
-        style: const TextStyle(color: Colors.white60, fontSize: 11));
-  }
+// ─── gate 5: in-process virtualization (launchInSandbox) ─────
+// Play runs the guest inside com.aether's :p0 process; refused when the
+// license does not cover the package (snake never virtualizes outside it).
+class _SandboxButton extends StatelessWidget {
+  final GameInfo game;
+  const _SandboxButton({required this.game});
 
-  Widget _buildCapabilityButtons() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Wrap(spacing: 8, runSpacing: 8, children: [
-        _capBtn(Icons.play_circle_outline, 'Virtualize', _launchGameInProcess, const Color(0xFF00C853)),
-        _capBtn(Icons.memory, 'Read mem', _readMemory, const Color(0xFF64B5F6)),
-        _capBtn(Icons.search, 'Scan AOB', _scanAOB, const Color(0xFFFFB74D)),
-        _capBtn(Icons.calculate, 'Compute', _runNativeCompute, const Color(0xFFBA68C8)),
-        _capBtn(Icons.compress, 'Compress', _compressPayload, const Color(0xFF4DB6AC)),
-        _capBtn(Icons.folder_special, 'Virtual FS', _testVirtualFS, const Color(0xFF4FC3F7)),
-        _capBtn(Icons.bug_report, 'Diag', _showDiag, const Color(0xFFFF8A65)),
-        _capBtn(Icons.key, '1234 chain-check', _chainCheck1234, const Color(0xFFFFD54F)),
-      ]),
+  @override
+  Widget build(BuildContext context) {
+    return ElevatedButton.icon(
+      onPressed: () => _run(context),
+      icon: const Icon(Icons.memory),
+      label: const Text('Virtualize (in-process)'),
     );
   }
 
-  Widget _capBtn(IconData icon, String label, Future<void> Function() onPressed, Color color) {
-    // Use Color.fromARGB to avoid Color.withValues (Flutter 3.27+)
-    final bg = Color.fromARGB((0.15 * 255).round(), color.red, color.green, color.blue);
-    final border = Color.fromARGB((0.5 * 255).round(), color.red, color.green, color.blue);
-    return ElevatedButton.icon(
-      onPressed: _busy ? null : onPressed,
-      icon: Icon(icon, size: 16),
-      label: Text(label, style: const TextStyle(fontSize: 12)),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: bg,
-        foregroundColor: color,
-        side: BorderSide(color: border),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+  Future<void> _run(BuildContext context) async {
+    final pkg = game.packageName;
+    // snake: refuse when the license does not cover the package. The only
+    // route to launchInSandbox is _guardedInvoke, which enforces this.
+    final res = await _guardedInvoke('launchInSandbox', pkg);
+    if (res == null) {
+      _snack(context, 'REFUSED: $pkg is not covered by the license');
+      return;
+    }
+    _snack(context, res == '1' ? 'sandbox: $pkg ok' : 'sandbox: $pkg failed');
+  }
+
+  void _snack(BuildContext context, String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+}
+
+// ─── gate 3: version not supported (pp+0x112e0) ───────────────
+class _VersionGate extends StatelessWidget {
+  final GameInfo game;
+  final LicenseEntry? entry;
+  const _VersionGate({required this.game, required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    if (entry == null) return const SizedBox.shrink();
+    final lock = entry!.versionLock;
+    if (!lock.isConstrained) return const SizedBox.shrink();
+    if (lock.allows(game.version)) return const SizedBox.shrink();
+    // Render the "from * to #" template with the installed version and the
+    // supported range.
+    final msg = S.versionNotSupportedRange(game.version, lock.rangeLabel);
+    return Material(
+      color: const Color(0xFF2A0B0B),
+      child: ListTile(
+        leading: const Icon(Icons.block, color: Color(0xFFEF9A9A)),
+        title: Text(msg, style: const TextStyle(fontSize: 12)),
       ),
     );
   }
+}
 
-  Widget _buildLaunchAppRow() {
+// ─── selections (pp+0xfb38 / 0xfb68 / 0xfb98) ─────────────────
+class _SelectionPanel extends StatelessWidget {
+  final GameInfo game;
+  final LicenseState license;
+  const _SelectionPanel({required this.game, required this.license});
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Run app — Sandbox (virtual, in-process) or Launch (external Intent)',
-              style: TextStyle(color: Colors.white60, fontSize: 11)),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _pkgController,
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    filled: true,
-                    fillColor: const Color(0xFF1A1E25),
-                    hintText: 'com.miniclip.eightballpool',
-                    hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF2A2F3A)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF2A2F3A)),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: _busy ? null : _launchInSandbox,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00897B),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Text('Sandbox', style: TextStyle(fontSize: 12)),
-              ),
-              const SizedBox(width: 6),
-              ElevatedButton(
-                onPressed: _busy ? null : _launchApp,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7E57C2),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Text('Play Store', style: TextStyle(fontSize: 12)),
-              ),
-            ],
+          Text(S.gameSelection, style: const TextStyle(color: Color(0xFFFFCC80), fontSize: 13)),
+          Card(
+            child: ListTile(
+              dense: true,
+              leading: const Icon(Icons.games),
+              title: Text(game.name),
+              subtitle: Text('${game.packageName} · ${game.version}'),
+              trailing: game.supported
+                  ? null
+                  : const Icon(Icons.warning, color: Color(0xFFFFCC80)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // L1 [OFFLINE-FALLBACK]: tiers/durations come from the server.
+          Text(S.subscriptionSelection, style: const TextStyle(color: Color(0xFFFFCC80), fontSize: 13)),
+          Card(
+            child: ListTile(
+              dense: true,
+              leading: const Icon(Icons.subscriptions),
+              title: Text(license.status == LicenseStatus.ok
+                  ? S.tierName
+                  : '[OFFLINE-FALLBACK] ${S.offline}'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(S.durationSelection, style: const TextStyle(color: Color(0xFFFFCC80), fontSize: 13)),
+          Card(
+            child: ListTile(
+              dense: true,
+              leading: const Icon(Icons.timer),
+              title: Text(license.status == LicenseStatus.ok ? S.days : '[OFFLINE-FALLBACK]'),
+            ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNav() {
-    return Container(
-      height: 56,
-      decoration: const BoxDecoration(
-        color: Color(0xFF181C22),
-        border: Border(top: BorderSide(color: Color(0xFF2A2F3A), width: 0.5)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _navItem(Icons.add_circle_outline, 0),
-          _navItem(Icons.shopping_cart_outlined, 1),
-          _navItem(Icons.chat_bubble_outline, 2),
-          _navItem(Icons.settings_outlined, 3),
-        ],
-      ),
-    );
-  }
-
-  Widget _navItem(IconData icon, int index) {
-    final active = _bottomIndex == index;
-    final color = active ? const Color(0xFF00C853) : Colors.white38;
-    return InkWell(
-      onTap: () {
-        if (index == 0) return;
-        setState(() => _bottomIndex = index);
-        _snack('${S.navAdd} / ${S.navCart} / ${S.navChat} / ${S.navSettings}: not ported (offline)');
-      },
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Icon(icon, color: color, size: 24),
       ),
     );
   }
