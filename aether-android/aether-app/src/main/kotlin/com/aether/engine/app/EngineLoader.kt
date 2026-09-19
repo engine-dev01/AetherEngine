@@ -39,7 +39,11 @@ object EngineLoader {
      */
     fun load(context: Context): EngineType {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val typeName = prefs.getString(KEY_TYPE, EngineType.SNAKE.name) ?: EngineType.SNAKE.name
+        // Default = AETHER: the only engine bundled in the APK. SNAKE/libengine.so
+        // is opt-in and gitignored (absent from CI), so defaulting to it made a
+        // local box (has .so) and a CI-built APK load different engines.
+        // Keep in sync with getEngineType() below.
+        val typeName = prefs.getString(KEY_TYPE, EngineType.AETHER.name) ?: EngineType.AETHER.name
         val type = runCatching { EngineType.valueOf(typeName) }.getOrDefault(EngineType.AETHER)
         return try {
             System.loadLibrary(type.libraryName)
