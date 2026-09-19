@@ -205,11 +205,10 @@ class _SnakeHomeState extends State<_SnakeHome> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: _canPop,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
+    return WillPopScope(
+      onWillPop: () async {
         _onBack();
+        return false; // prevent default pop
       },
       child: Scaffold(
         appBar: AppBar(
