@@ -65,6 +65,20 @@ jobs:
           sh aether-android/test-stubs/run-aether-test.sh
           echo "✅ Unit tests passed — continuing to release build setup"
 
+      - name: Static gates (python3 only, before any SDK setup)
+        # [gate 0b] จับ import/member/named-arg ผิดในฝั่ง Dart ก่อนเสีย setup 3 นาที
+        # (คลาส PopScope ที่ทำให้ analyze พัง = ถูกจับที่นี่ ไม่ใช่หลัง build)
+        run: |
+          set -e
+          python3 scripts/dart_static_check.py
+          for g in jni_parity native_chain_parity structural_gates \
+                   wire_contract_check structure_coherence \
+                   snake_call_shape snake_ui_parity evidence_conflict_scan; do
+            echo "=== scripts/$g.py ==="
+            python3 "scripts/$g.py"
+          done
+          echo "✅ Static gates passed"
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:

@@ -43,6 +43,12 @@ jobs:
           flutter analyze --no-fatal-infos --no-fatal-warnings
         working-directory: app
 
+      - name: Flutter unit + widget tests
+        # gate: version_lock range semantics, registry/SEVIP contract,
+        # 6-language string tree, LicenseBanner offline labelling, KeyCard.
+        run: flutter test --reporter expanded
+        working-directory: app
+
   compile:
     # ข้ามบน main: build-apk.yml ครอบคลุม gradle native compile + flutter build แล้ว
     # (ป้องกัน native compile + debug APK build ซ้ำฟรี ~5-6 นาที ทุก push ไป main)
@@ -170,9 +176,9 @@ jobs:
       - name: Run evidence gates
         run: |
           set -e
-          for g in jni_parity native_chain_parity structural_gates \
-                   wire_contract_check structure_coherence \
-                   snake_call_shape evidence_conflict_scan; do
+          for g in dart_static_check jni_parity native_chain_parity \
+                   structural_gates wire_contract_check structure_coherence \
+                   snake_call_shape snake_ui_parity evidence_conflict_scan; do
             echo "=== scripts/$g.py ==="
             python3 "scripts/$g.py"
           done
