@@ -46,17 +46,23 @@ object SandboxManager {
     private const val DEFAULT_PGL_VERSION = "90d8aa15a2de2cb4"
     private const val PGL_DIR_HASH = "a0rjgdfbjd8fhfglkew6"
 
-    // ---- FLEXIBLE VERSION MAP (dynamic via remote endpoint) ----
-    // Instead of hardcoding KNOWN_PGL_VERSIONS / VERSION_CODE_TO_PGL / PGL_FILES_BY_VERSION,
-    // resolvePglVersions() now fetches version → pglVersion mapping from the server.
-    // If the API returns no map or is unavailable, fall back to the
-    // in‑code defaults below (maintain backwards compatibility).
+    // Single endpoint literal for the Kotlin side — the license/config API.
+    // Both the PGL map and the package version are read from here, so the URL
+    // exists exactly once in this module. Dart keeps its own copy
+    // (LicenseStore) because the license flow is Dart-only
+    // (T1: rest.snakeseller.com = 1 hit in libapp.so, 0 in smali).
+    // [OFFLINE-FALLBACK] callers fall back to the DEFAULT_* tables whenever the
+    // endpoint is unreachable — the engine never requires it to be up.
+    private const val CONFIG_ENDPOINT = "https://rest.snakeseller.com/api/request/"
+
+    // ---- FLEXIBLE VERSION MAP (dynamic, DEFAULT_* = offline fallback) ----
+    // resolvePglVersions() reads the version → pglVersion mapping from
+    // CONFIG_ENDPOINT. When the API answer carries no map (or the call
+    // fails), the DEFAULT_* tables below are used so the engine stays
+    // fully usable offline.
     //
-    // API response shape (optional, from rest.snakeseller.com/api/request):
+    // API response shape (optional):
     //   {"pgl_map": { "56.30.0": "90d8aa...", "19.4.0": "6e72ab..." }}
-    //
-    // When absent, we keep the legacy entries for known targets (8BP/Carrom/etc)
-    // as a graceful fallback.
     private val DEFAULT_PGL_VERSIONS = listOf(
         "90d8aa15a2de2cb4",  // 8 Ball Pool (baseline)
     )
@@ -69,7 +75,7 @@ object SandboxManager {
     //   snake 56.23.2: 3 ไฟล์ = libbuffer_pgl.so, libpglarmor.so, libgame-BPM-...-Module-3965.so
     //   ninja 56.29.1: 7 ไฟล์ = 3 ตัวนั้น + libadsurge* 4 ตัว (Module-4013)
     //   libfile_lock_pgl.so ไม่มีในต้นแบบทั้ง 2 เวอร์ชัน — อย่าสร้าง (ของแต่ง)
-    private val PGL_FILES_BY_VERSION = mapOf(
+    private val DEFAULT_PGL_FILES_BY_VERSION = mapOf(
         "90d8aa15a2de2cb4" to listOf(   // 8BP 56.23.2 — ตรงต้นแบบ snake
             "libbuffer_pgl.so",
             "libpglarmor.so",
@@ -86,17 +92,12 @@ object SandboxManager {
         ),
     )
 
-    // Fallback ชื่อ libgame module เมื่อ scan เครื่องจริงไม่ได้ (ไม่มีสิทธิ์ list dir)
-    private fun pglGameModuleName(pglVersion: String): String =
-        if (pglVersion == "90d8aa15a2de2cb4") "libgame-BPM-GooglePlay-Gold-Release-Module-3965.so"
-        else "libgame-BPM-GooglePlay-Gold-Release-Module-4013.so"
-
     // ---- Remote PGL map fetch (optional) ----
     // Returns map versionString->pglHash or null if fetch fails.
     private fun fetchRemotePglMap(): Map<String, String>? {
         return try {
-            val url = java.net.URL("https://rest.snakeseller.com/api/request/")
-            val conn = url.openConnection() as java.net.HttpURLConnection
+            val conn = (java.net.URL(CONFIG_ENDPOINT).openConnection()
+                as java.net.HttpURLConnection)
             conn.requestMethod = "GET"
             conn.connectTimeout = 4000
             conn.readTimeout = 4000
@@ -246,8 +247,8 @@ object SandboxManager {
             // locally‑resolved versionName.
             fun fetchRemoteVersion(): String? {
                 return try {
-                    val url = java.net.URL("https://rest.snakeseller.com/api/request/")
-                    val conn = url.openConnection() as java.net.HttpURLConnection
+                    val conn = (java.net.URL(CONFIG_ENDPOINT).openConnection()
+                        as java.net.HttpURLConnection)
                     conn.requestMethod = "GET"
                     conn.connectTimeout = 4000
                     conn.readTimeout = 4000
@@ -255,7 +256,7 @@ object SandboxManager {
                     val stream = conn.inputStream.bufferedReader(Charsets.UTF_8)
                     val text = stream.use { it.readText() }
                     // Very small JSON – simple regex extraction avoids pulling a JSON lib.
-                    val match = "\\"version\\"\\s*:\\s*\\"([^\\"]+)\\"".toRegex().find(text)
+                    val match = "\"version\"\\s*:\\s*\"([^\"]+)\"".toRegex().find(text)
                     match?.groupValues?.get(1)
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to fetch remote version: ${e.message}")
@@ -607,7 +608,7 @@ object SandboxManager {
         File(stubDir).mkdirs()
 
         // per-version (ตรงต้นแบบ: 56.23.2=3 ไฟล์, 56.29.1=7 ไฟล์) — ไม่มี libfile_lock
-        val stubFiles = PGL_FILES_BY_VERSION[pglVersion] ?: emptyList()
+        val stubFiles = DEFAULT_PGL_FILES_BY_VERSION[pglVersion] ?: emptyList()
         val realPglDir = File("/data/user/0/$targetPkg/$PGL_DIR_HASH/$pglVersion/arm64-v8a")
         for (stubName in stubFiles) {
             val stubFile = File(stubDir, stubName)
