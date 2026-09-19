@@ -190,7 +190,11 @@ class _SnakeHomeState extends State<_SnakeHome> {
   /// PopScope back handler (pp+0x11190: "Press back again to exit"):
   /// record the press, show the snackbar once, and only allow the pop when
   /// the second press lands within 2 seconds of the first.
-  void _onBack() {
+  /// Back handler (pp+0x11190: "Press back again to exit"): the first press
+  /// records the time and shows the snackbar; a second press within 2 s
+  /// returns true so the route actually pops. Returning the decision (rather
+  /// than an always-false handler) is what keeps the snake behaviour intact.
+  Future<bool> _onBack() async {
     final now = DateTime.now();
     if (_lastBack == null || now.difference(_lastBack!) > const Duration(seconds: 2)) {
       _lastBack = now;
@@ -198,18 +202,16 @@ class _SnakeHomeState extends State<_SnakeHome> {
         SnackBar(content: Text(S.pressBackAgain), duration: const Duration(seconds: 2)),
       );
       setState(() => _canPop = false);
-      return;
+      return false;                        // first press → stay in the app
     }
     setState(() => _canPop = true);
+    return true;                           // second press within 2 s → pop
   }
 
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
-      onWillPop: () async {
-        _onBack();
-        return false; // prevent default pop
-      },
+      onWillPop: _onBack,
       child: Scaffold(
         appBar: AppBar(
           title: Text(S.appName),
@@ -354,6 +356,16 @@ class _KeysPageState extends State<_KeysPage> {
         ),
         // Unlocked grid — every card shows SEVIP, none locked (user directive).
         const _GameCardGrid(),
+        // snake selection sections (pp+0xfb68 Subscription / pp+0xfb98 Duration)
+        _SelectionPanel(game: game, license: widget.license),
+        // blueprint gate 4 — KEY 1234 call-stack chain check (routes through
+        // _guardedInvoke, the single license choke point).
+        const _ParityPanel(),
+        // blueprint gate 5 — in-process virtualization (launchInSandbox).
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          child: _SandboxButton(game: game),
+        ),
         // Get Subscription CTA (purple, key icon) pinned above the tabs.
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
@@ -915,9 +927,7 @@ class _SelectionPanel extends StatelessWidget {
               leading: const Icon(Icons.games),
               title: Text(game.name),
               subtitle: Text('${game.packageName} · ${game.version}'),
-              trailing: game.supported
-                  ? null
-                  : const Icon(Icons.warning, color: Color(0xFFFFCC80)),
+              // unlocked mode — no ⚠️ trailing icon is drawn (registry doc)
             ),
           ),
           const SizedBox(height: 8),

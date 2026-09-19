@@ -158,11 +158,17 @@ class Games {
   // UNLOCKED MODE (user directive): every game shows the SEVIP chip and is
   // tappable — no greyed/⚠️ locked state. Versions kept as displayed in the
   // captures; Soccer Stars gets a real version so its pill renders too.
+  //
+  // [NOT-IN-POOL] package IDs below are NOT evidence-derived: the T1 audit
+  // found `com.miniclip.*` = 0 hits across smali/java_out/res_out/Dart/libapp
+  // (docs/DART_LICENSE_FLOW.md §1, reference/snake/*). snake resolves the
+  // target package from the server license at runtime; the registry is our
+  // local identity table and must stay labelled as such.
   static const List<GameInfo> all = [
     GameInfo(
       name: '8 Ball Pool',
       version: '56.30.0',
-      packageName: 'com.miniclip.eightballpool',
+      packageName: 'com.miniclip.eightballpool',  // [NOT-IN-POOL] local identity
       coverAsset: null,
       tier: 'SEVIP',
       showVersionPill: true,
@@ -171,7 +177,7 @@ class Games {
     GameInfo(
       name: 'Carrom Pool',
       version: '19.4.0',
-      packageName: 'com.miniclip.carrom',
+      packageName: 'com.miniclip.carrom',         // [NOT-IN-POOL] local identity
       coverAsset: null,
       tier: 'SEVIP',
       showVersionPill: true,
@@ -180,7 +186,7 @@ class Games {
     GameInfo(
       name: 'Soccer Stars',
       version: '19.4.0',
-      packageName: 'com.miniclip.soccerstars',
+      packageName: 'com.miniclip.soccerstars',    // [NOT-IN-POOL] local identity
       coverAsset: null,
       tier: 'SEVIP',
       showVersionPill: true,
