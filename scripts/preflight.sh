@@ -80,6 +80,13 @@ echo ""
 echo "[G3e] Wire contract check (W1-W3)"
 python3 scripts/wire_contract_check.py && PASS=$((PASS+1)) || { FAIL=$((FAIL+1)); err "wire contract พัง (literal กระจัด/ type ข้าม codec ไม่ตรง)"; }
 
+# G3f: Dart static pre-check (imports / balance / members / named args)
+# ทำงานก่อน flutter analyze เสมอ — python3 ล้วน ไม่ต้องมี Dart SDK
+# จุดประสงค์: จับ PopScope-style breakage (named param ไม่มีจริง) ก่อน CI
+echo ""
+echo "[G3f] Dart static check (imports/balance/members/named-args)"
+python3 scripts/dart_static_check.py && PASS=$((PASS+1)) || { FAIL=$((FAIL+1)); err "dart static FAIL (import/member/named-arg — จะทำ flutter analyze/test พัง)"; }
+
 # G4: Unresolved reference
 echo ""
 echo "[G4] Unresolved reference check (semantic)"

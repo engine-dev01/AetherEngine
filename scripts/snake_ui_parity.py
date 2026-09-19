@@ -112,14 +112,21 @@ def check_deviation_labels(root):
         if lab not in ui:
             WARNS.append(f'LABEL-ABSENT {lab} (no labeled deviations of this kind)')
 
-    # negative control: a hard-coded package name must not appear unlabeled
-    for m in re.finditer(r"['\"](com\.[a-z0-9.]+)['\"]", ui):
-        pkg = m.group(1)
-        # allowed: our own identity + registry (games.dart) + labeled comments
-        if pkg in ('com.aether', 'com.miniclip.eightballpool', 'com.miniclip.carrompool',
-                   'com.miniclip.soccerstars'):
-            continue
-        FAILS.append(f'UNLABELED-PACKAGE {pkg}')
+    # negative control: every hard-coded package literal must be labelled.
+    # The registry's package IDs are NOT evidence-derived (T1 audit:
+    # `com.miniclip.*` = 0 hits in smali/java_out/res_out/Dart/libapp), so a
+    # bare literal — or one that is neither our own identity nor carrying a
+    # deviation label on its line — is a FAIL. This is deliberately stricter
+    # than an allowlist: renaming a package cannot silently pass.
+    LABELS = ('[NOT-IN-POOL]', '[OFFLINE-FALLBACK]', '[NOT-IN-ENGINE]')
+    for line in ui.split('\n'):
+        code = line.split('//')[0]
+        for m in re.finditer(r"['\"](com\.[a-z0-9.]+)['\"]", code):
+            pkg = m.group(1)
+            if pkg == 'com.aether':      # our own identity
+                continue
+            if not any(lab in line for lab in LABELS):
+                FAILS.append(f'UNLABELED-PACKAGE {pkg}')
 
 
 def check_tab_structure(root):
