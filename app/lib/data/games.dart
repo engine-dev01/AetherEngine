@@ -33,22 +33,35 @@ class GameInfo {
   final String? coverAsset;  // e.g. 'assets/games/8ball.png' (nullable for fallback)
   final bool supported;        // false = show ⚠️ icon (license not covering it)
 
+  // ── screenshot-anchored display fields (T2: user-supplied UI captures) ──
+  // tier == null → no yellow chip on the card. Observed value: 'SEVIP'.
+  final String? tier;
+  // showVersionPill controls whether the purple version pill is drawn over
+  // the cover. In the capture, Soccer Stars has NO pill (only the ⚠️), so
+  // its registry entry sets this false even though a version string exists.
+  final bool showVersionPill;
+
   const GameInfo({
     required this.name,
     required this.version,
     required this.packageName,
     this.coverAsset,
     this.supported = true,
+    this.tier,
+    this.showVersionPill = true,
   });
 
   /// Copy with license-driven overrides (version_lock / supported flag).
-  /// Called only from LicenseStore — never from UI directly.
+  /// Called only from LicenseStore — never from UI directly. Preserves the
+  /// display-only fields (tier / showVersionPill) unchanged.
   GameInfo withLicense({VersionLock? lock, bool? supported}) => GameInfo(
         name: name,
         version: lock?.effectiveFor(version) ?? version,
         packageName: packageName,
         coverAsset: coverAsset,
         supported: supported ?? this.supported,
+        tier: tier,
+        showVersionPill: showVersionPill,
       );
 }
 
@@ -130,23 +143,49 @@ class VersionLock {
 ///     coverAsset: 'assets/games/carrom.png',
 ///   ),
 class Games {
-  /// All supported games (currently 1: 8 Ball Pool).
+  /// Supported games — order mirrors the home-screen grid (left→right):
+  ///   8 Ball Pool · Carrom Pool · Soccer Stars
   /// packageName = IDENTITY only (display + tracking). Engine runs
   /// in-process; no Intent is dispatched to this package.
   ///
-  /// NOTE: version is the FALLBACK; the server license may pin it
+  /// version / tier / showVersionPill are anchored to the UI captures
+  /// (T2 evidence): pills read 56.30.0 and 19.4.0; Soccer Stars shows a
+  /// ⚠️ overlay and NO pill → supported:false, showVersionPill:false.
+  ///
+  /// NOTE: version is still the FALLBACK; the server license may pin it
   /// (version_lock). Use Games.byPackage(...).version, not this list
   /// directly, when displaying the effective version.
+  // UNLOCKED MODE (user directive): every game shows the SEVIP chip and is
+  // tappable — no greyed/⚠️ locked state. Versions kept as displayed in the
+  // captures; Soccer Stars gets a real version so its pill renders too.
   static const List<GameInfo> all = [
     GameInfo(
       name: '8 Ball Pool',
-      version: '56.23.2',
-      packageName: 'com.miniclip.eightballpool',  // identity only, not launched
-      coverAsset: null,  // placeholder icon (gradient + sports_baseball)
+      version: '56.30.0',
+      packageName: 'com.miniclip.eightballpool',
+      coverAsset: null,
+      tier: 'SEVIP',
+      showVersionPill: true,
+      supported: true,
     ),
-    // Example (disabled — uncomment to enable):
-    // GameInfo(name: 'Carrom Pool', version: '6.0.0', packageName: 'com.miniclip.carrompool'),
-    // GameInfo(name: 'Soccer Stars', version: '4.0.0', packageName: 'com.miniclip.soccerstars'),
+    GameInfo(
+      name: 'Carrom Pool',
+      version: '19.4.0',
+      packageName: 'com.miniclip.carrom',
+      coverAsset: null,
+      tier: 'SEVIP',
+      showVersionPill: true,
+      supported: true,
+    ),
+    GameInfo(
+      name: 'Soccer Stars',
+      version: '19.4.0',
+      packageName: 'com.miniclip.soccerstars',
+      coverAsset: null,
+      tier: 'SEVIP',
+      showVersionPill: true,
+      supported: true,
+    ),
   ];
 
   /// First (default) game — used by home screen's "Play" button

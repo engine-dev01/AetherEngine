@@ -39,7 +39,7 @@ object EngineLoader {
      */
     fun load(context: Context): EngineType {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val typeName = prefs.getString(KEY_TYPE, EngineType.AETHER.name) ?: EngineType.AETHER.name
+        val typeName = prefs.getString(KEY_TYPE, EngineType.SNAKE.name) ?: EngineType.SNAKE.name
         val type = runCatching { EngineType.valueOf(typeName) }.getOrDefault(EngineType.AETHER)
         return try {
             System.loadLibrary(type.libraryName)

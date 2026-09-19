@@ -55,7 +55,7 @@ object Engine {
     // ─── Version support (8 Ball Pool) ───
     // Evidence: reference/BOOT_LINKAGE.md SP-01 / call_linkage.json CH-12
     // Endpoint and response-key are pinned from SNAKE T5 pool (pp+0x139d8/0x139f8)
-    const val ENDPOINT_URL = "https://rest.snakeseller.com/api/request/"
+    const val ENDPOINT_URL = "https://aether-config.local/v1/license"
     const val ENDPOINT_ACTION = "?action=upload_profile_image"
     const val RESPONSE_KEY_SUCCESS = "success"
     const val RESPONSE_KEY_DATA = "data"

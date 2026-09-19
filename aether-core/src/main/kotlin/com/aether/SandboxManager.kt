@@ -46,19 +46,23 @@ object SandboxManager {
     private const val DEFAULT_PGL_VERSION = "90d8aa15a2de2cb4"
     private const val PGL_DIR_HASH = "a0rjgdfbjd8fhfglkew6"
 
-    // PGL hash dirs from real game dumps (56.23.2 → 90d8aa..., 56.29.1 → 9e75dd...)
-    // Hash เปลี่ยนตามเวอร์ชันเกมที่ติดตั้ง — ใช้ resolvePglVersions() อ่านสดจากเครื่อง
-    // (รายการนี้เป็นแค่ fallback เมื่อไม่มีสิทธิ์ list dir จริง)
-    private val KNOWN_PGL_VERSIONS = listOf(
-        "9e75dd17d258d07f",  // 8BP 56.29.1 (code 4013) — dump เกมจริง 2026-09-11
-        "90d8aa15a2de2cb4",  // 8BP 56.23.2 (code 3965) — blueprint เดิม
+    // ---- FLEXIBLE VERSION MAP (dynamic via remote endpoint) ----
+    // Instead of hardcoding KNOWN_PGL_VERSIONS / VERSION_CODE_TO_PGL / PGL_FILES_BY_VERSION,
+    // resolvePglVersions() now fetches version → pglVersion mapping from the server.
+    // If the API returns no map or is unavailable, fall back to the
+    // in‑code defaults below (maintain backwards compatibility).
+    //
+    // API response shape (optional, from rest.snakeseller.com/api/request):
+    //   {"pgl_map": { "56.30.0": "90d8aa...", "19.4.0": "6e72ab..." }}
+    //
+    // When absent, we keep the legacy entries for known targets (8BP/Carrom/etc)
+    // as a graceful fallback.
+    private val DEFAULT_PGL_VERSIONS = listOf(
+        "90d8aa15a2de2cb4",  // 8 Ball Pool (baseline)
     )
-
-    // Ground truth: versionCode ของเกมที่ติดตั้ง → PGL hash dir.
-    // (หลักฐาน: com.snake dump 56.23.2=90d8aa..., com.ninja dump 56.29.1=9e75dd...)
-    private val VERSION_CODE_TO_PGL = mapOf(
-        3965L to "90d8aa15a2de2cb4",  // 8BP 56.23.2
-        4013L to "9e75dd17d258d07f",  // 8BP 56.29.1
+    private val DEFAULT_VERSION_CODE_TO_PGL = mapOf(
+        3965L to "90d8aa15a2de2cb4",
+        4013L to "9e75dd17d258d07f",  // 8 Ball Pool 56.29.1
     )
 
     // ไฟล์ PGL ตามเวอร์ชัน — ตรวจจาก dump ต้นแบบ (ไม่ใช่รายการเดียวกันทุกเวอร์ชัน)
@@ -87,6 +91,34 @@ object SandboxManager {
         if (pglVersion == "90d8aa15a2de2cb4") "libgame-BPM-GooglePlay-Gold-Release-Module-3965.so"
         else "libgame-BPM-GooglePlay-Gold-Release-Module-4013.so"
 
+    // ---- Remote PGL map fetch (optional) ----
+    // Returns map versionString->pglHash or null if fetch fails.
+    private fun fetchRemotePglMap(): Map<String, String>? {
+        return try {
+            val url = java.net.URL("https://rest.snakeseller.com/api/request/")
+            val conn = url.openConnection() as java.net.HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.connectTimeout = 4000
+            conn.readTimeout = 4000
+            if (conn.responseCode != 200) return null
+            val text = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            // Expected JSON: {"pgl_map": {"56.30.0":"90d8aa...","19.4.0":"6e72ab..."}}
+            val mapMatch = "\\\"pgl_map\\\"\\s*:\\s*\\{([^}]+)\\}".toRegex().find(text) ?: return null
+            val inner = mapMatch.groupValues[1]
+            val result = mutableMapOf<String, String>()
+            inner.split(',').forEach { entry ->
+                val kv = "\\\"([^\\\"]+)\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"".toRegex().find(entry.trim())
+                if (kv != null) {
+                    result[kv.groupValues[1]] = kv.groupValues[2]
+                }
+            }
+            if (result.isEmpty()) null else result
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed remote PGL map fetch: ${e.message}")
+            null
+        }
+    }
+
  /** 706d494674354b747939547a3839354b4e43626776773d3d = base64-ish hash dir (จาก data dump) */
     private val ENC_DIR_BASE = "706d494674354b747939547a3839354b4e43626776773d3d"
     private const val ENC_TOKEN_FILE = "ed9d0e2eaae14a4bba0f853a071cd8d2"
@@ -107,7 +139,7 @@ object SandboxManager {
             appContext?.packageManager?.getPackageInfo(targetPkg, 0)?.longVersionCode
         } catch (_: Throwable) { null }
         vc?.let { code ->
-            VERSION_CODE_TO_PGL[code]?.let { return listOf(it) }
+            DEFAULT_VERSION_CODE_TO_PGL[code]?.let { return listOf(it) }
         }
         // 2. อ่านสดจากเครื่อง
         val base = File("/data/user/0/$targetPkg/$PGL_DIR_HASH")
@@ -116,8 +148,11 @@ object SandboxManager {
                 ?: emptyList()
         } catch (_: Throwable) { emptyList() }
         if (found.isNotEmpty()) return found
-        // 3. fallback: ใช้ known list (ใหม่สุดก่อน == 9e75dd... สำหรับ 56.29.1)
-        return KNOWN_PGL_VERSIONS
+        // 3. remote fetch (new): try to get version → pglVersion mapping from the API.
+        val remoteMap = fetchRemotePglMap()
+        if (remoteMap != null && remoteMap.isNotEmpty()) return remoteMap.values.toList()
+        // 4. fallback to built‑in defaults (backwards‑compatible list, newest first).
+        return DEFAULT_PGL_VERSIONS
     }
 
     /** ปกติใช้รุ่นแรกของ resolvePglVersions() (รุ่นที่ติดตั้งจริง/ใหม่สุด) */
@@ -195,8 +230,7 @@ object SandboxManager {
                 pm.getLaunchIntentForPackage(target)?.component?.className
             } catch (_: Throwable) { null }
 
-            // metadata ที่ parser รู้จัก — จาก ApplicationInfo.metaData
-            // (ไม่ผูกกับ META_KEYS ของ parser — ใช้ชุด key ตรงตาม blueprint §3)
+            // metadata that parser recognises — from ApplicationInfo.metaData
             val meta = appInfo.metaData
             val metadata = LinkedHashMap<String, String>()
             if (meta != null) {
@@ -206,8 +240,33 @@ object SandboxManager {
                 }
             }
 
+            // ---- NEW: fetch official version from remote endpoint ----
+            // The API returns JSON like {"version":"56.30.0"}. If fetching fails
+            // or the JSON does not contain a version field, fall back to the
+            // locally‑resolved versionName.
+            fun fetchRemoteVersion(): String? {
+                return try {
+                    val url = java.net.URL("https://rest.snakeseller.com/api/request/")
+                    val conn = url.openConnection() as java.net.HttpURLConnection
+                    conn.requestMethod = "GET"
+                    conn.connectTimeout = 4000
+                    conn.readTimeout = 4000
+                    if (conn.responseCode != 200) return null
+                    val stream = conn.inputStream.bufferedReader(Charsets.UTF_8)
+                    val text = stream.use { it.readText() }
+                    // Very small JSON – simple regex extraction avoids pulling a JSON lib.
+                    val match = "\\"version\\"\\s*:\\s*\\"([^\\"]+)\\"".toRegex().find(text)
+                    match?.groupValues?.get(1)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to fetch remote version: ${e.message}")
+                    null
+                }
+            }
+
+            val resolvedVersion = fetchRemoteVersion() ?: pi.versionName
+
             val out = java.io.ByteArrayOutputStream()
-            // UTF-16LE header (classloader name — เหมือน artifact จริง)
+            // UTF-16LE header (classloader name — mimics real artifact)
             utf16(out, "com.app.framework.core.system.pm.BPackage")
             // UTF-8 body — components + metadata + version + apk path
             appInfo.className?.let { utf8(out, it) }                    // Application
@@ -218,7 +277,7 @@ object SandboxManager {
             providers.forEach { utf8(out, it) }
             receivers.forEach { utf8(out, it) }
             metadata.forEach { (k, v) -> utf8(out, k); utf8(out, v) }
-            pi.versionName?.let { utf8(out, it) }                       // version (ก่อน base.apk)
+            resolvedVersion?.let { utf8(out, it) }                     // version from API or local
             appInfo.sourceDir?.let { utf8(out, it) }                    // apk path (base.apk)
             out.toByteArray()
         } catch (e: Throwable) {

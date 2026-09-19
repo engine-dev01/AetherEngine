@@ -7,6 +7,7 @@
 // This file deliberately defines NO widget of its own: a second MaterialApp
 // here would shadow the one in home_screen.dart and drop the connectivity
 // gate (snake gate 1, pp+0xf630).
+import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 
 void main() => runApp(const SnakeEngineApp());

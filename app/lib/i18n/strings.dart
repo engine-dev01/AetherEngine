@@ -365,24 +365,22 @@ class S {
   static const _close = ['Close', 'إغلاق', 'Cerrar', 'बंद करें', 'Tutup', 'Isara'];
   static String get close => _close[lang.index];
 
-  // [NOT-IN-POOL] language selector label (snake shows flags + native names).
-  static const _lang = ['Language', 'اللغة', 'Idioma', 'भाषा', 'Bahasa', 'Wika'];
-  static String get lang => _lang[lang.index];
+  /// The selector's own label. Renamed to [langLabel] to avoid clashing
+  /// with the [lang] field / [setLang] method above (duplicate_definition).
+  static const _langLabel = ['Language', 'اللغة', 'Idioma', 'भाषा', 'Bahasa', 'Wika'];
+  static String get langLabel => _langLabel[lang.index];
 
-  // [NOT-IN-POOL] the selector action itself.
-  static const _setLang = ['Set Language', 'ضبط اللغة', 'Establecer idioma',
+  /// The selection list itself. Renamed to [selectLang] to avoid clashing
+  /// with the [lang] field and [setLang] above (duplicate_definition).
+  static const _selectLang = ['Set Language', 'ضبط اللغة', 'Establecer idioma',
       'भाषा सेट करें', 'Tetapkan Bahasa', 'Itakda ang Wika'];
-  static String get setLang => _setLang[lang.index];
+  static String get selectLang => _selectLang[lang.index];
 
   // [NOT-IN-POOL] key device-binding note (snake's "Device id:" pp+0x103d0
-  // covers the label; this is the explanation line).
-  static const _keyDeviceBound = [
-    'This key is bound to this device.',
-    'هذا المفتاح مرتبط بهذا الجهاز.',
-    'Esta clave está vinculada a este dispositivo.',
-    'यह कुंजी इस डिवाइस से बंधी है।',
-    'Kunci ini terikat pada peranti ini.',
-    'Nakatali ang susi sa device na ito.'];
+  // covers the label; this is the explanation line). The pool string the UI
+  // actually renders is the warning below (pp+0xfbf8), so this shorter note
+  // is intentionally NOT emitted as a table.
+  //
   // [NOT-IN-ENGINE] engine-facing: snake has no such panel; ours exists to
   // prove parity (chainCheck + handshakeStatus + license gate).
   static const _endpointNote = [

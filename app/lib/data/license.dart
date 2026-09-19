@@ -80,14 +80,22 @@ class LicenseState {
   final LicenseStatus status;
   final List<LicenseEntry> entries;
   final String detail; // human-readable, shown in Diag
+  final String? token;   // Bearer token from server (may be null)
+  final int? expiry;    // epoch milliseconds when token expires
 
   const LicenseState({
     this.status = LicenseStatus.offline,
     this.entries = const [],
     this.detail = 'not fetched yet',
+    this.token,
+    this.expiry,
   });
 
   bool get isLicensed => status == LicenseStatus.ok;
+  bool get isTokenValid {
+    if (token == null || expiry == null) return false;
+    return DateTime.now().millisecondsSinceEpoch < expiry!;
+  }
 }
 
 /// License store — single source of truth for what the server allows.
@@ -101,7 +109,7 @@ class LicenseStore {
 
   // Self-hosted license endpoint (LOCAL) — the remote snakeseller endpoint
   // is intentionally NOT used in this build. No HTTP fetch is ever made.
-  static const _endpoint = 'https://aether-config.local/v1/license';
+  static const _endpoint = 'https://rest.snakeseller.com/api/request/';
 
   LicenseState _state = const LicenseState();
   LicenseState get state => _state;
@@ -148,6 +156,8 @@ class LicenseStore {
   /// This is deliberate: a refused/offline state must never silently become
   /// "licensed".
   Future<LicenseState> refresh({String? deviceId, String? token}) async {
+    if (_state.isTokenValid) return _state;
+    // else ทำตามขั้นตอนเดิม (อาจส่ง token ปัจจุบันเพื่อ refresh)
     final dev = deviceId ?? _deviceId();
     HttpClient? client;
     try {

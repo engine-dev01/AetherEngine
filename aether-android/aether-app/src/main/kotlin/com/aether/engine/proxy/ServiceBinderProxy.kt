@@ -26,7 +26,7 @@ import java.lang.reflect.Proxy
  *
  * Services ที่ init() ติดตั้งจริง 11 ตัว (constants มี 40 — SNAKE 48):
  * activity package jobscheduler mount user account location notification
- * shortcut usagestats — ตรง 11 ตัวที่ guest 8BP/GMS เรียกใน crash trace
+ * shortcut usagestats window — ตรง 11 ตัวที่ guest 8BP/GMS เรียกใน crash trace
  */
 object ServiceBinderProxy {
 
@@ -179,6 +179,32 @@ object ServiceBinderProxy {
      */
     fun listProxiedServices(): List<String> {
         return proxyCache.keys.toList()
+    }
+
+    /**
+     * getService() ≡ KOS ServiceManager.getService(String):IBinder
+     * คืน IBinder ของ service (wrapper หรือ REAL binder) ตามลำพลายูเมื่อเป็นไปได้
+     * ใช้สำหรับ P2: เชื่อมต่อ Guest→:engine IPC ผ่าน ServiceManager.sCache
+     */
+    fun getService(name: String): IBinder? {
+        val key = sCacheKeyOf(name) ?: return null
+        val cache = serviceManagerCache()
+        cache?.let {
+            val wrapper = it[key]
+            if (wrapper != null) {
+                Log.d(TAG, "getService($name): wrapper found in sCache")
+                return wrapper
+            }
+        }
+        // sCache ไม่มี — fallback ไปยัง real binder จาก ServiceManager
+        val svcManager = getServiceManager()
+        val binder = getBinderFromServiceManager(svcManager, name)
+        if (binder != null) {
+            Log.d(TAG, "getService($name): real binder (sCache miss)")
+        } else {
+            Log.w(TAG, "getService($name): binder NOT FOUND")
+        }
+        return binder
     }
 
     /**
@@ -777,13 +803,6 @@ object ServiceBinderProxy {
                 "primary_clip"-> "android.content.IPrimaryClip"
                 "shortcut"    -> "android.content.pm.IShortcutService"
                 "usagestats"  -> "android.app.usage.IUsageStatsManager"
-                "package"     -> "android.content.pm.IPackageManager"
-                "jobscheduler" -> "android.app.job.IJobScheduler"
-                "mount"       -> "android.os.storage.IStorageManager"
-                "user"        -> "android.os.IUserManager"
-                "account"     -> "android.accounts.IAccountManager"
-                "location"    -> "android.location.ILocationManager"
-                "notification" -> "android.app.INotificationManager"
                 else -> return null
             }
             Class.forName(className)

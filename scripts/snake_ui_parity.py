@@ -33,7 +33,7 @@ def _read(p):
 # Each entry: (label, substring, required-in-files)
 # ───────────────────────────────────────────────────────────────
 REQUIRED_STRINGS = [
-    # internet-check gate (pp+0xf620, 6 languages)
+    # internet-check gate (pp+0xf630, 6 languages; pp+0xf620 is the app name)
     ('internet-check en', 'Snake Engine needs an active internet connection'),
     ('internet-check ar', 'Snake Engine يحتاج إلى اتصال نشط'),
     ('internet-check es', 'Snake Engine necesita una conexión activa'),

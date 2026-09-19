@@ -26,7 +26,7 @@
 //   L5  keys are device-bound: the warning is shown with the real deviceId.
 
 import 'dart:async';
-import 'dart:ui';
+import 'dart:io' show Socket;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -34,7 +34,6 @@ import 'package:flutter/services.dart';
 import '../data/games.dart';
 import '../data/license.dart';
 import '../i18n/strings.dart';
-import '../widgets/key_card.dart';
 import '../widgets/license_banner.dart';
 
 // Entry point lives in main.dart (single main() in the app — see that file).
@@ -154,6 +153,7 @@ class _SnakeHome extends StatefulWidget {
 class _SnakeHomeState extends State<_SnakeHome> {
   int _tab = 0;
   DateTime? _lastBack;
+  bool _canPop = false;
   bool _busy = false;
   LicenseState _license = const LicenseState();
 
@@ -187,23 +187,30 @@ class _SnakeHomeState extends State<_SnakeHome> {
     });
   }
 
-  Future<bool> _onWillPop() async {
-    // pp+0x11190: "Press back again to exit"
+  /// PopScope back handler (pp+0x11190: "Press back again to exit"):
+  /// record the press, show the snackbar once, and only allow the pop when
+  /// the second press lands within 2 seconds of the first.
+  void _onBack() {
     final now = DateTime.now();
     if (_lastBack == null || now.difference(_lastBack!) > const Duration(seconds: 2)) {
       _lastBack = now;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(S.pressBackAgain), duration: const Duration(seconds: 2)),
       );
-      return false;
+      setState(() => _canPop = false);
+      return;
     }
-    return true;
+    setState(() => _canPop = true);
   }
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: _onWillPop,
+    return PopScope(
+      canPop: _canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _onBack();
+      },
       child: Scaffold(
         appBar: AppBar(
           title: Text(S.appName),
@@ -326,8 +333,46 @@ class _KeysPageState extends State<_KeysPage> {
         _InstallGate(game: game),
         _VersionGate(game: game, entry: entry),
         LicenseBanner(state: widget.license),
-        // selections (pp+0xfb38 / 0xfb68 / 0xfb98)
-        _SelectionPanel(game: game, license: widget.license),
+        // Supported Games section header + count badge (matches capture).
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+          child: Row(
+            children: [
+              const Icon(Icons.sports_esports_outlined, size: 18, color: Colors.white70),
+              const SizedBox(width: 8),
+              Text(S.gameSelection, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white10,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('${Games.all.length}', style: const TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+        ),
+        // Unlocked grid — every card shows SEVIP, none locked (user directive).
+        const _GameCardGrid(),
+        // Get Subscription CTA (purple, key icon) pinned above the tabs.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {},
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6B2DBC),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.vpn_key_outlined),
+              label: const Text('Get Subscription', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ),
         // sub-tabs
         Row(
           children: [
@@ -726,6 +771,126 @@ class _VersionGate extends StatelessWidget {
       child: ListTile(
         leading: const Icon(Icons.block, color: Color(0xFFEF9A9A)),
         title: Text(msg, style: const TextStyle(fontSize: 12)),
+      ),
+    );
+  }
+}
+
+// ─── UNLOCKED GAME CARD GRID (user directive: all cards show SEVIP, none locked) ──
+// Renders Games.all as a horizontal-scroll-free wrapped row of square cards,
+// each with: cover tile → yellow SEVIP chip (top-center) → purple version pill
+// (bottom-center) → name label below. No ⚠️/lock state is ever drawn because
+// every registry entry now carries supported:true + tier:'SEVIP'.
+class _GameCardGrid extends StatelessWidget {
+  const _GameCardGrid();
+
+  @override
+  Widget build(BuildContext context) {
+    final games = Games.all;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        alignment: WrapAlignment.start,
+        children: [for (final g in games) _GameCard(game: g)],
+      ),
+    );
+  }
+}
+
+class _GameCard extends StatelessWidget {
+  final GameInfo game;
+  const _GameCard({required this.game});
+
+  static const double _tile = 96;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: _tile,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              // Cover tile (placeholder gradient since no asset bundled yet).
+              Container(
+                width: _tile,
+                height: _tile,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF2A2F37), Color(0xFF161A20)],
+                  ),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: const Icon(Icons.sports_baseball, size: 40, color: Colors.white24),
+              ),
+              // Yellow SEVIP chip — top center, overlapping the cover edge.
+              Positioned(
+                top: -6,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 4)],
+                    ),
+                    child: Text(
+                      game.tier ?? 'SEVIP',
+                      style: const TextStyle(
+                        color: Color(0xFFFFD54F),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // Purple version pill — bottom center, overlapping the cover edge.
+              if (game.showVersionPill && game.version.isNotEmpty)
+                Positioned(
+                  bottom: -6,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6B2DBC),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        game.version,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            game.name,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+        ],
       ),
     );
   }
