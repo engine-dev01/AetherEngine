@@ -14,11 +14,13 @@
 // The registry here is the FALLBACK. package + version are ultimately
 // governed by the server license that Dart fetches from
 // https://rest.snakeseller.com/api/request/ (deviceId → encryptedData →
-// Access Token → version_lock). LicenseStore.refresh() may lower
-// `supported` or pin `version` at runtime; it never invents packages
-// that are absent from this registry (snake: package is received over the
-// "H" MethodChannel key, then handed to s2.a(ctx, pkg) — never trusted
-// from a UI filename).
+// Access Token → version_lock).
+//
+// SELF-HOSTED MODE (NEW):
+//   - Remote snakeseller endpoint is NOT used.
+//   - License is sourced from self-hosted config.
+//   - This file remains the registry of names/versions; version constraints
+//     are managed entirely via LicenseStore's offline/local license model.
 //
 // Virtualization is IN-PROCESS via stub+swap (Scaffold-4), NOT via an
 // external Intent to the installed app. Pressing Play runs the guest

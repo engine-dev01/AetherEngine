@@ -1,5 +1,9 @@
 // data/license.dart — Server license store (mirrors snake's Dart-side flow)
 //
+// OFFLINE / SELF-HOSTED MODE: no remote snakeseller endpoint.
+//   • Server endpoint: https://aether-config.local/v1/license (local only)
+//   • License is pinned by self-hosted config, not fetched over network.
+//
 // T1 EVIDENCE (libapp.so strings, docs/DART_LICENSE_FLOW.md):
 //   rest.snakeseller.com @0x43fed          — license endpoint (Dart-only, NOT in smali)
 //   api/request/        @0x44010          — same string cluster
@@ -25,10 +29,10 @@
 // the UI file names. It is received from the server license. This store is
 // the counterpart of snake's Dart-side license code.
 //
-// OFFLINE MODE: this build has no server. If the network is unavailable the
-// store degrades to the bundled fallback (registry defaults) and reports
-// the degradation in [status] so the UI can show it honestly, mirroring
-// snake's offline behavior rather than inventing a fake "licensed" state.
+// OFFLINE / SELF-HOSTED: network fetch is disabled. License is now sourced
+// entirely from self-hosted config, so `refresh` always returns a local
+// LicenseState and never performs an HTTP POST. This ensures AetherEngine
+// works without external dependencies.
 
 import 'dart:async';
 import 'dart:convert';
@@ -95,7 +99,9 @@ class LicenseStore {
   LicenseStore._();
   static final LicenseStore instance = LicenseStore._();
 
-  static const _endpoint = 'https://rest.snakeseller.com/api/request/';
+  // Self-hosted license endpoint (LOCAL) — the remote snakeseller endpoint
+  // is intentionally NOT used in this build. No HTTP fetch is ever made.
+  static const _endpoint = 'https://aether-config.local/v1/license';
 
   LicenseState _state = const LicenseState();
   LicenseState get state => _state;
